@@ -8,6 +8,7 @@ import ruffus.cmdline as cmdline
 import os
 import tempdir
 import argparse
+import sys
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 # LOCAL IMPORT

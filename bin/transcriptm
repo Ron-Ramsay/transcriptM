@@ -80,6 +80,7 @@ transcriptm --paired_end sample1-1.fq.gz sample1-2.fq.gz sample2-1.fq.gz sample2
     # Options   
     parser._optionals.title = "Arguments"
     parser.add_argument("--paired_end",nargs="+", dest="paired_end", help="Input files: paired sequences files of raw metatranscriptomics reads (.fq.gz format)\n  e.g. --paired_end sample1_1.fq.gz sample1_2.fq.gz sample2_1.fq.gz sample2_2.fq.gz",required=True)
+    parser.add_argument("--sortmerna_precomputed", dest="sortmerna_precomputed", help="Skip the steps up to and including SortMeRNA")
     parser.add_argument("--metaG_contigs", dest="metaG_contigs", help="All contigs from the reference metagenome in a fasta file",required=True)
     parser.add_argument("--dir_bins", dest="dir_bins", help="Directory which contains several annotated population genomes (bins)\n -> gff format, the others files would be ignored",required=True)
     parser.add_argument("--threads", dest="threads", help="Number of threads to use", default=20, type=int)
@@ -134,6 +135,7 @@ transcriptm --paired_end sample1-1.fq.gz sample1-2.fq.gz sample2-1.fq.gz sample2
     mapping_args.add_argument('--no_mapping_filter',  action="store_true", dest='no_mapping_filter', help='Do not adjust the mapping stringency by filtering alignments', default=False)
     
     args = parser.parse_args()
+
     
     # check if the SortMeRNA database is indexed
     if os.path.isdir(os.path.join(args.db_path,'1-SortMeRNA/')) and not os.path.isdir(os.path.join(args.db_path,'1-SortMeRNA/index')):

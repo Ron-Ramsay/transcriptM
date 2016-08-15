@@ -4,6 +4,8 @@
 # lib
 import os
 from ruffus import *
+import extern
+import IPython
 import numpy
 import ruffus.cmdline as cmdline
 import subprocess
@@ -53,38 +55,43 @@ class Pipeline :
             exit(1)
 
         # prefix
-        self.alias_pe = {}        
-        for i in range(int(len(self.args.paired_end)/2)) :
-            self.alias_pe[os.path.join(self.args.working_dir,'sample-'+str(i)+'_R1.fq.gz')] =self.args.paired_end[2*i]
-            self.alias_pe[os.path.join(self.args.working_dir,'sample-'+str(i)+'_R2.fq.gz')] =self.args.paired_end[2*i+1]
-        
-        self.prefix_pe= {}
-        for  i in range(int(len(self.args.paired_end)/2)) :
-            value = self.longest_common_substring(os.path.basename(self.args.paired_end[2*i]),
-                                             os.path.basename(self.args.paired_end[2*i+1]))
-            if value.endswith(('.','_','-'),0):
-                value=value[:-1]  
-            elif value.endswith(('_R','-R','.R'),0):  
-                value=value[:-2]                               
-            self.prefix_pe['sample-'+str(i)]=value
-        
-        if len(set(self.prefix_pe.values()))< int(len(self.args.paired_end)/2):
-            print [item for item, count in collections.Counter(self.prefix_pe.values()).items() if count > 1]
-            raise Exception ("2 sets of paired-ends files have the same prefix. Rename one set. \n")
-            exit(1)
-         
-        self.tot_pe= {}
-        for i in range(int(len(self.args.paired_end)/2)) :
-            count = int(subprocess.check_output("zcat %s | wc -l " %(self.args.paired_end[2*i]), shell=True).split(' ')[0])/4 
-            self.tot_pe[self.prefix_pe['sample-'+str(i)]]=count
-            print  ('\t').join([self.prefix_pe['sample-'+str(i)],'raw data','FastQC-check','raw reads',str(count),'100.00 %'])
+        self.alias_pe = {}  
+        if self.args.paired_end:
+            for i in range(int(len(self.args.paired_end)/2)) :
+                self.alias_pe[os.path.join(self.args.working_dir,'sample-'+str(i)+'_R1.fq.gz')] =self.args.paired_end[2*i]
+                self.alias_pe[os.path.join(self.args.working_dir,'sample-'+str(i)+'_R2.fq.gz')] =self.args.paired_end[2*i+1]
+            
+            self.prefix_pe= {}
+            for  i in range(int(len(self.args.paired_end)/2)) :
+                value = self.longest_common_substring(os.path.basename(self.args.paired_end[2*i]),
+                                                 os.path.basename(self.args.paired_end[2*i+1]))
+                if value.endswith(('.','_','-'),0):
+                    value=value[:-1]  
+                elif value.endswith(('_R','-R','.R'),0):  
+                    value=value[:-2]                               
+                self.prefix_pe['sample-'+str(i)]=value
+            
+            if len(set(self.prefix_pe.values()))< int(len(self.args.paired_end)/2):
+                print [item for item, count in collections.Counter(self.prefix_pe.values()).items() if count > 1]
+                raise Exception ("2 sets of paired-ends files have the same prefix. Rename one set. \n")
+                exit(1)
+             
+            self.tot_pe= {}
+            for i in range(int(len(self.args.paired_end)/2)) :
+                count = int(subprocess.check_output("zcat %s | wc -l " %(self.args.paired_end[2*i]), shell=True).split(' ')[0])/4 
+                self.tot_pe[self.prefix_pe['sample-'+str(i)]]=count
+                print  ('\t').join([self.prefix_pe['sample-'+str(i)],'raw data','FastQC-check','raw reads',str(count),'100.00 %'])
+                
+
         # log
         self.logger, self.logging_mutex = cmdline.setup_logging (__name__, args.log_file, args.verbose)
         
-
+        
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # MISCELLANEOUS FONCTIONS
+    # MISCELLANEOUS FUNCTIONS
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    # 
+    
     def re_symlink (self,input_file, soft_link_name, logger, logging_mutex):
         """
         Helper function: relinks soft symbolic link if necessary
@@ -148,11 +155,20 @@ class Pipeline :
                 else:
                     M[x][y] = 0
         return S1[x_longest-longest: x_longest]
+        
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # PIPELINE STAGES FUNCTION
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #            
-    def pipeline_stages(self):     
+    def pipeline_stages(self): 
+        
+        mode = 0
+        if self.args.sortmerna_precomputed: mode = 4
+        
+        @active_if(True)
+        def testfunction ():
+            pass
+            
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # PIPELINE: STEP N_1
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -163,12 +179,11 @@ class Pipeline :
             """
             Make soft link in working directory
             """
-            
-            input_file= self.alias_pe[soft_link_name]
-            with logging_mutex:
-                logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
-            self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
-            
+            if mode < 1:
+                input_file= self.alias_pe[soft_link_name]
+                with logging_mutex:
+                    logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
+                self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
             
         @mkdir(self.args.working_dir)        
         @transform(self.args.metaG_contigs, formatter(),
@@ -179,9 +194,10 @@ class Pipeline :
             """
             Make soft link in working directory
             """
-            with logging_mutex:
-                logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
-            self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
+            if mode < 1:
+                with logging_mutex:
+                    logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
+                self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
         
         # check if bwa index are present 
         @active_if(self.has_index(self.args.metaG_contigs,['.amb','.bwt','.ann','.pac','.sa']))
@@ -194,9 +210,10 @@ class Pipeline :
             """
             Make soft link in working directory
             """
-            with logging_mutex:
-                logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
-            self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
+            if mode < 1:
+                with logging_mutex:
+                    logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
+                self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
             
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # PIPELINE: STEP N_2
@@ -209,37 +226,42 @@ class Pipeline :
         def trimmomatic(input_files, output_file,log,logger, logging_mutex):
             """
             Trimmomatic. Trim and remove adapters of paired reads
-            """   
-            if len(input_files) != 2:
-                raise Exception("One of read pairs %s missing" % (input_files,))
-            cmd= "trimmomatic PE -threads %d -%s %s %s %s %s %s %s ILLUMINACLIP:%s:2:30:10 \
-        LEADING:%d SLIDINGWINDOW:4:%d TRAILING:%d CROP:%d HEADCROP:%d MINLEN:%d 2> %s" %(self.args.threads,
-                                                                                    self.args.phred,
-                                                                                    input_files[0],
-                                                                                    input_files[1],
-                                                                                    output_file[0],
-                                                                                    output_file[2],
-                                                                                    output_file[1],
-                                                                                    output_file[3],
-                                                                                    self.adapters,
-                                                                                    self.args.min_qc,
-                                                                                    self.args.min_avg_qc,
-                                                                                    self.args.min_qc,
-                                                                                    self.args.crop,
-                                                                                    self.args.headcrop,
-                                                                                    self.args.min_len,
-                                                                                    log)
-            with logging_mutex:
-                logger.info("Trim and remove adapters of paired reads of %(input_files)s" % locals())
-                logger.debug("trimmomatic: cmdline\n"+ cmd)
-            subprocess.check_call(cmd, shell=True)
-           
-            #  ~~~~ monitoring: count of reads  ~~~~ #  
-            name_sample = self.prefix_pe[os.path.basename(input_files[0]).split('_R1.fq.gz')[0]]            
-            stat= Monitoring(self.tot_pe[name_sample])
-            ## processed reads
-            processed_reads = stat.count_processed_reads(log)
-            print ('\t').join([name_sample,'trimming','Trimmomatic','raw reads',str(processed_reads),stat.get_tot_percentage(processed_reads)])
+            """  
+            if mode < 2:
+                if len(input_files) != 2:
+                    raise Exception("One of read pairs %s missing" % (input_files,))  
+                
+                cmd = "trimmomatic PE "
+                cmd += "-threads %d " % (self.args.threads)
+                cmd += "-%s " % (self.args.phred)
+                cmd += "%s " % (input_files[0])
+                cmd += "%s " % (input_files[1])
+                cmd += "%s " % (output_file[0])
+                cmd += "%s " % (output_file[2])
+                cmd += "%s " % (output_file[1])
+                cmd += "%s " % (output_file[3])
+                cmd += "ILLUMINACLIP:%s:2:30:10         " % (self.adapters)
+                cmd += "LEADING:%d " % (self.args.min_qc)
+                cmd += "SLIDINGWINDOW:4:%d " % (self.args.min_avg_qc)
+                cmd += "TRAILING:%d " % (self.args.min_qc)
+                cmd += "CROP:%d " % (self.args.crop)
+                cmd += "HEADCROP:%d " % (self.args.headcrop)
+                cmd += "MINLEN:%d " % (self.args.min_len)
+                cmd += "2> %s" % (log)
+
+                with logging_mutex:
+                    logger.info("Trim and remove adapters of paired reads of %(input_files)s" % locals())
+                    logger.debug("trimmomatic: cmdline\n"+ cmd)
+                
+
+                extern.run(cmd)
+                
+                #  ~~~~ monitoring: count of reads  ~~~~ #  
+                name_sample = self.prefix_pe[os.path.basename(input_files[0]).split('_R1.fq.gz')[0]]            
+                stat= Monitoring(self.tot_pe[name_sample])
+                ## processed reads
+                processed_reads = stat.count_processed_reads(log)
+                print ('\t').join([name_sample,'trimming','Trimmomatic','raw reads',str(processed_reads),stat.get_tot_percentage(processed_reads)])
 
                   
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -253,17 +275,18 @@ class Pipeline :
             """
             BamM make. Map all reads against PhiX genome
             """
-            cmd ="bamm make -d %s -c %s %s -s %s %s -o %s --threads %d -K --quiet" %(self.ref_genome_phiX,
-                                                                                 input_files[0],
-                                                                                 input_files[1],
-                                                                                 input_files[2],
-                                                                                 input_files[3],
-                                                                                 self.args.working_dir,
-                                                                                 self.args.threads)
-            with logging_mutex:
-                logger.info("Map reads [%s] against phiX genome"%(','.join(input_files)))
-                logger.debug("phiX_map: cmdline\n"+ cmd)
-            subprocess.check_call(cmd, shell=True)
+            if mode < 3:
+                cmd ="bamm make -d %s -c %s %s -s %s %s -o %s --threads %d -K --quiet" %(self.ref_genome_phiX,
+                                                                                     input_files[0],
+                                                                                     input_files[1],
+                                                                                     input_files[2],
+                                                                                     input_files[3],
+                                                                                     self.args.working_dir,
+                                                                                     self.args.threads)
+                with logging_mutex:
+                    logger.info("Map reads [%s] against phiX genome"%(','.join(input_files)))
+                    logger.debug("phiX_map: cmdline\n"+ cmd)
+                extern.run(cmd)
             
         
         @transform(phiX_map, suffix(".bam"),".txt",self.logger, self.logging_mutex)
@@ -271,11 +294,12 @@ class Pipeline :
             """
             Samtools. Get the IDs of PhiX reads
             """
-            cmd ="samtools view -F4 %s | awk {'print $1'} > %s "%(input_files,output_files)
-            with logging_mutex:
-                logger.info("Extract ID of phiX reads in %s" %(input_files))
-                logger.debug("phiX_ID: cmdline\n"+ cmd)
-            subprocess.check_call(cmd, shell=True)
+            if mode < 3:
+                cmd ="samtools view -F4 %s | awk {'print $1'} > %s "%(input_files,output_files)
+                with logging_mutex:
+                    logger.info("Extract ID of phiX reads in %s" %(input_files))
+                    logger.debug("phiX_ID: cmdline\n"+ cmd)
+                extern.run(cmd)
 
         
         @collate(phiX_ID,formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),'{path[0]}/{BASE[0]}phiX_ID.log','{BASE[0]}',self.logger, self.logging_mutex)
@@ -283,54 +307,50 @@ class Pipeline :
             """
             Concatenate all PhiX ID found previously
             """
-            cmd ="cat %s %s %s | uniq > %s" %(input_files[0],
-                                        input_files[1],
-                                        input_files[2],
-                                        output_file)
-            with logging_mutex:
-                logger.info("Concatenate all ID of phiX reads [%s]"%(','.join(input_files)))
-                logger.debug("phiX_concat_ID: cmdline\n"+ cmd)
-            subprocess.check_call(cmd, shell=True) 
+            if mode < 3:
+                cmd ="cat %s %s %s | uniq > %s" %(input_files[0],
+                                            input_files[1],
+                                            input_files[2],
+                                            output_file)
+                with logging_mutex:
+                    logger.info("Concatenate all ID of phiX reads [%s]"%(','.join(input_files)))
+                    logger.debug("phiX_concat_ID: cmdline\n"+ cmd)
+                extern.run(cmd) 
            
-           #  ~~~~ monitoring: count of reads  ~~~~ #                 
-            name_sample = self.prefix_pe[os.path.basename(output_file).split('_trimm_phiX_ID.log')[0]]            
-            stat= Monitoring(self.tot_pe[name_sample])
-            ## non phiX reads
-            trimm_file = os.path.join(self.args.working_dir,[f for f in os.listdir(self.args.working_dir) if re.search(r'%s.*trimmomatic.log'%(basename.split('_')[0]), f)][0])     
-            processed_reads = stat.count_processed_reads(trimm_file)
-            phiX_reads = int(subprocess.check_output("wc -l "+output_file, shell=True).split(' ')[0])
-            non_phiX_reads = processed_reads - phiX_reads
-            print ('\t').join([name_sample,'PhiX removal','bamM make','processed reads',str(non_phiX_reads),stat.get_tot_percentage(non_phiX_reads)])
- 
-
+               #  ~~~~ monitoring: count of reads  ~~~~ #                 
+                name_sample = self.prefix_pe[os.path.basename(output_file).split('_trimm_phiX_ID.log')[0]]            
+                stat= Monitoring(self.tot_pe[name_sample])
+                ## non phiX reads
+                trimm_file = os.path.join(self.args.working_dir,[f for f in os.listdir(self.args.working_dir) if re.search(r'%s.*trimmomatic.log'%(basename.split('_')[0]), f)][0])     
+                processed_reads = stat.count_processed_reads(trimm_file)
+                phiX_reads = int(subprocess.check_output("wc -l "+output_file, shell=True).split(' ')[0])
+                non_phiX_reads = processed_reads - phiX_reads
+                print ('\t').join([name_sample,'PhiX removal','bamM make','processed reads',str(non_phiX_reads),stat.get_tot_percentage(non_phiX_reads)])
 
         @subdivide(trimmomatic,regex(r"trimm_[UP][12].fq.gz"),["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"])
         def QC_output(input_files,output_files):
             pass
-        
         
         @transform(QC_output,suffix(".fq.gz"),add_inputs(phiX_concat_ID),"_phiX_ext.fq",self.logger, self.logging_mutex)
         def phiX_extract(input_files, output_files,logger, logging_mutex):
             """
             Remove PhiX reads
             """
-            try:
-                cmd ="fxtract -S -H -f %s -z -v %s > %s" %(input_files[1], input_files[0],output_files)
-                with logging_mutex:
-                    logger.info("Extract phiX reads in the file %s"%(input_files[0]))
-                    logger.debug("phiX_extract: cmdline\n"+ cmd)
-                subprocess.check_call(cmd, shell=True) 
-            #flag -z if gzip input file
-            except subprocess.CalledProcessError:
-                cmd ="gzip  -cd %s > %s" %(input_files[0],output_files)
-                with logging_mutex:
-                    logger.info("No phiX reads in the file: %s"%(input_files[0]))
-                    logger.debug("phiX_extract: cmdline\n"+ cmd)
-                subprocess.check_call(cmd, shell=True) 
+            if mode < 3:
+                try:
+                    cmd ="fxtract -S -H -f %s -z -v %s > %s" %(input_files[1], input_files[0],output_files)
+                    with logging_mutex:
+                        logger.info("Extract phiX reads in the file %s"%(input_files[0]))
+                        logger.debug("phiX_extract: cmdline\n"+ cmd)
+                    extern.run(cmd) 
+                #flag -z if gzip input file
+                except subprocess.CalledProcessError:
+                    cmd ="gzip  -cd %s > %s" %(input_files[0],output_files)
+                    with logging_mutex:
+                        logger.info("No phiX reads in the file: %s"%(input_files[0]))
+                        logger.debug("phiX_extract: cmdline\n"+ cmd)
+                    extern.run(cmd) 
 
-        
-        
-    
         
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # PIPELINE: STEP N_4
@@ -342,15 +362,16 @@ class Pipeline :
             """
             SortMeRNA. Remove non-coding RNA
             """
-            cmd= "sortmerna --ref %s --reads %s --aligned %s --other %s --fastx -a %d --log" %(self.args.path_db_smr,
-                                                                                               input_files,
-                                                                                               ncRNA_files.split('.fq')[0],
-                                                                                               output_files.split('.fq')[0],
-                                                                                               self.args.threads)
-            with logging_mutex:
-                logger.info("Remove reads with SortMeRNA in %(input_files)s"%locals())
-                logger.debug("sortmerna: cmdline\n"+ cmd)
-            subprocess.check_call(cmd, shell=True)
+            if mode < 4:
+                cmd= "sortmerna --ref %s --reads %s --aligned %s --other %s --fastx -a %d --log" %(self.args.path_db_smr,
+                                                                                                   input_files,
+                                                                                                   ncRNA_files.split('.fq')[0],
+                                                                                                   output_files.split('.fq')[0],
+                                                                                                   self.args.threads)
+                with logging_mutex:
+                    logger.info("Remove reads with SortMeRNA in %(input_files)s"%locals())
+                    logger.debug("sortmerna: cmdline\n"+ cmd)
+                extern.run(cmd)
     
     
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -381,15 +402,18 @@ class Pipeline :
             with logging_mutex:
                 logger.info("Find IDs of single reads generated with SortMeRNA in (%s,%s)" %(input_files[0], input_files[1]))
                 logger.debug("concat_for_mapping: cmdline\n"+ cmd_ID)            
-            subprocess.check_call(['bash','-c',cmd_ID])
+            #subprocess.check_call(['bash','-c',cmd_ID])
+            extern.run(cmd_ID)
             with logging_mutex:
                 logger.info("Prepare paired reads files for the mapping (%s,%s)" %(input_files[0], input_files[1]))
                 logger.debug("concat_for_mapping: cmdline\n"+ cmd_paired)  
             subprocess.check_call(cmd_paired, shell=True)
+            #extern.run(cmd_paired)
             with logging_mutex:
                 logger.info("Prepare single reads files for the mapping (%s,%s)" %(input_files[2], input_files[3]))
                 logger.debug("concat_for_mapping: cmdline\n"+ cmd_single)  
             subprocess.check_call(cmd_single, shell=True)
+            #extern.run(cmd_single)
         
             #  ~~~~ monitoring: count of reads  ~~~~ #     
             name_sample = self.prefix_pe[os.path.basename(output_files[0]).split('_concat_paired_R1.fq')[0]]            
@@ -398,7 +422,6 @@ class Pipeline :
             non_ncRNA_reads = stat.count_seq_fq(output_files[0])+stat.count_seq_fq(output_files[2])
             print ('\t').join([name_sample,'remove ncRNA','SortMeRNA','filtered reads (1st)',
                                str(non_ncRNA_reads),stat.get_tot_percentage(non_ncRNA_reads)])
-
 
         # Map separately paired-end and singletons with 'BamM' and merge the results in one .bam file
         # WARNINGS
@@ -430,19 +453,19 @@ class Pipeline :
             with logging_mutex:     
                 logger.info("Map reads [%s] to the reference metagenome %s"%(",".join(input_files[0]),input_files[1]))
                 logger.debug("map2ref: cmdline\n"+ cmd)  
-            subprocess.check_call(cmd, shell=True)
+            extern.run(cmd)
             
             cmd2= "samtools merge -f %s %s %s ; samtools view -b -F2304 %s > %s " %(bams[2],bams[0],bams[1],bams[2],output_file)
             with logging_mutex:     
                 logger.info("Concatenate %s and %s"%(bams[0],bams[1]))
                 logger.debug("map2ref: cmdline\n"+ cmd2)  
-            subprocess.check_call(cmd2, shell=True)
+            extern.run(cmd2)
                 
             cmd3= "samtools flagstat %s > %s " %(output_file,flagstat)
             with logging_mutex:     
                 logger.info("Compute statistics of %(output_file)s (samtools flastat)"%locals())
                 logger.debug("map2ref: cmdline\n"+ cmd3)  
-            subprocess.check_call(cmd3, shell=True)
+            extern.run(cmd3)
     
             #  ~~~~ monitoring: count of reads  ~~~~ #   
             name_sample = self.prefix_pe[os.path.basename(output_file).split('.bam')[0]]            
@@ -451,7 +474,6 @@ class Pipeline :
             mapped_reads = stat.count_mapping_reads(flagstat,True)
             print ('\t').join([name_sample,'alignment','BamM make','filtered reads (2nd)',
                                str(mapped_reads),stat.get_tot_percentage(mapped_reads)])
-        
         
         @transform(map2ref,formatter('.bam'),"{path[0]}/{basename[0]}_filtered.bam", 
                    "{path[0]}/{basename[0]}_stringency_filter.log",self.logger, self.logging_mutex)
@@ -469,13 +491,13 @@ class Pipeline :
                 with logging_mutex:     
                     logger.info("Filter %(input_file)s" % locals())
                     logger.debug("mapping_filter: cmdline\n"+ cmd)  
-                subprocess.check_call(cmd, shell=True)
+                extern.run(cmd)
 
                 cmd3= "samtools flagstat %s > %s " %(output_file,flagstat)
                 with logging_mutex:     
                     logger.info("Compute statistics of %(input_file)s (samtools flastat)" % locals())
                     logger.debug("mapping_filter: cmdline\n"+ cmd3)  
-                subprocess.check_call(cmd3, shell=True)
+                extern.run(cmd3)
 
                 #  ~~~~ monitoring: count of reads  ~~~~ #   
                 name_sample = self.prefix_pe[os.path.basename(output_file).split('_filtered.bam')[0]]            
@@ -516,7 +538,7 @@ class Pipeline :
                 with logging_mutex:     
                     logger.info("Calculte coverage from %s and %s"%(input_file,self.list_gff[i]))  
                     logger.debug("bam2normalized_cov: cmdline\n"+ cmd)                                       
-                subprocess.check_call(cmd, shell=True)        
+                extern.run(cmd)        
                 
                 if lib_size !=0:
                     cmd1= "sed 's/\t/|/g' %s | awk  -F '|' 'NR>=2 {$6= $6/%d*10e6}1' OFS='|' |  sed 's/|/\t/g' > %s ; rm %s " %(coverage_file,
@@ -529,7 +551,7 @@ class Pipeline :
                 with logging_mutex:     
                     logger.info("Convert coverage to normalized_cov")
                     logger.debug("bam2normalized_cov: cmdline\n"+ cmd1)
-                subprocess.check_call(cmd1, shell=True)                 
+                extern.run(cmd1)                
         
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # PIPELINE: STEP N_6 BIS (raw count)
@@ -547,16 +569,15 @@ class Pipeline :
             for i in range(len(self.list_gff)):
                 gff_no_fasta= tempfile.NamedTemporaryFile(prefix='transcriptm', suffix='.gff')
                 cmd0 = "sed '/^##FASTA$/,$d' %s > %s" %(self.list_gff[i], gff_no_fasta.name)
-                subprocess.check_call(cmd0, shell=True)
+                extern.run(cmd0)
                 cmd ="bedtools intersect -c -a %s -b %s -bed >  %s " %( gff_no_fasta.name,
                                                                        input_file,
                                                                        input_file.split('.bam')[0]+'_'+os.path.splitext(os.path.basename((self.list_gff[i])))[0] +'_count.csv')
                 with logging_mutex:     
                     logger.info("Calculte raw count from %s and %s "%(input_file,gff_no_fasta.name))  
                     logger.debug("bam2raw_count: cmdline\n"+ cmd)                                       
-                subprocess.check_call(cmd, shell=True)        
+                extern.run(cmd)        
 
- 
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # PIPELINE: STEP N_7 (normalized_cov table)
@@ -568,7 +589,8 @@ class Pipeline :
             """
             Create one table that contains RPKM values for each gene of each bin for the different samples
             """
-            input_files=list(set(input_files))          
+            input_files=list(set(input_files))      
+            if len(input_files)==0: raise Exception("Incorrect input detected. Likely causes: \n\tOnly one sequence file sumitted\n\tAssembly file has been tampered with")
             normalized_cov_col= [list([]) for _ in xrange(int(len(self.args.paired_end)/2)+3)]       
             # headers of cols ->  0, n-1, n
             normalized_cov_col[0].append('bin_ID')
@@ -579,7 +601,7 @@ class Pipeline :
             for b in bins_path :
                 files_b= [f for f in input_files if re.search('_'+os.path.basename(b)+'_normalized_cov.csv', f)]  
                 # first col: bins_name
-                with open(files_b[0],'r') as csvfile:                    
+                with open(files_b[0],'r') as csvfile:                
                         reader = csv.reader(csvfile, delimiter='\t') 
                         next(reader)  # skip header 
                         for row in reader:
@@ -678,7 +700,6 @@ class Pipeline :
                 logger.info("Create table that contains raw count values for each gene of each bin given as input for the different samples: %s"%(','.join(self.prefix_pe.values())))    
     
     
-    
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # PIPELINE: TRACE FILE N_1
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -707,7 +728,7 @@ class Pipeline :
             with logging_mutex:
                 logger.info("Create a fastqc report of raw %(input_file)s" % locals())
                 logger.debug("view_raw_data: cmdline\n"+cmd)
-            subprocess.check_call(cmd, shell=True)
+            extern.run(cmd)
     
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # PIPELINE: TRACE FILE N_2
@@ -738,7 +759,7 @@ class Pipeline :
             with logging_mutex:
                 logger.info("Create a fastqc report of processed %(input_file)s" % locals())
                 logger.debug("view_processed_data: cmdline\n"+cmd)
-            subprocess.check_call(cmd, shell=True)
+            extern.run(cmd)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # PIPELINE:TRACE FILE N_3
@@ -763,7 +784,7 @@ class Pipeline :
             with logging_mutex:
                 logger.info("Save log files: %(input_files)s" % locals())
                 logger.debug("save_log: cmdline\n"+cmd)                
-            subprocess.check_call(cmd, shell=True)      
+            extern.run(cmd)      
      
      
         subdir_4= os.path.join(self.args.output_dir,"reads_distribution") 
@@ -830,7 +851,7 @@ class Pipeline :
             with logging_mutex:
                 logger.info("Concatenate summaries: %(input_files)s" % locals())
                 logger.debug("concatenate_logtables: cmdline\n"+cmd)                
-            subprocess.check_call(cmd, shell=True)  
+            extern.run(cmd)  
             
             
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -861,17 +882,14 @@ class Pipeline :
                 with logging_mutex:
                     logger.info("Copy the processed reads %s in the ouptut directory" %(input_file[i]))
                     logger.debug("save_processed_reads: cmdline\n"+cmd)
-                subprocess.check_call(cmd, shell=True)
+                extern.run(cmd)
     
-
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # PIPELINE: RUN
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #         
         cmdline.run(self.args)
         
-    
-    
     
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # CLEAR FUNCTION: rename files ...
@@ -901,7 +919,11 @@ class Pipeline :
         try:
             shutil.rmtree(reads_distrib_dir)
         except OSError:
-            pass    
-        
-        
-        
+            pass   
+            
+            
+            
+            
+            
+            
+            

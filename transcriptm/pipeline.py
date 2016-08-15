@@ -589,8 +589,8 @@ class Pipeline :
             """
             Create one table that contains RPKM values for each gene of each bin for the different samples
             """
-            if len(input_files)==0: raise Exception("Incorrect input detected - you most likely only submitted one sequence file.")
-            input_files=list(set(input_files))          
+            input_files=list(set(input_files))      
+            if len(input_files)==0: raise Exception("Incorrect input detected. Likely causes: \n\tOnly one sequence file sumitted\n\tAssembly file has been tampered with")
             normalized_cov_col= [list([]) for _ in xrange(int(len(self.args.paired_end)/2)+3)]       
             # headers of cols ->  0, n-1, n
             normalized_cov_col[0].append('bin_ID')

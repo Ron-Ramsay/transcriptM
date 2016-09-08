@@ -1,2 +1,6 @@
 *.pyc
 transcriptm/*.pyc
+
+.ruffus_history.sqlite
+transcriptm/.ruffus_history.sqlite
+bin/.ruffus_history.sqlite

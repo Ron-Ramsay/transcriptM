@@ -4,12 +4,11 @@
 	  See http://http://transcriptm.tiddlyspot.com/
 """
 
-print "rkr: test 2"
+print "rkr: test 3"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 import os        # miscellaneous operating system interfaces. (Python Standard Library module).
 import argparse  # parser for command-line options, arguments and sub-commands. (Python Standard Library module).
                  # NB. `argparse` only seems to be directly used here to be inherited by another class `CustomHelpFormatter`.
@@ -17,69 +16,61 @@ import argparse  # parser for command-line options, arguments and sub-commands. 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # External, non-standard modules
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 import ruffus.cmdline as cmdline  # light-weight computational pipeline management. 
-								  # non-standard module. See http://www.ruffus.org.uk.
+                                  # non-standard module. See http://www.ruffus.org.uk.
 import tempdir  # encapsulates temporary directories which just disappear after use. 
                 # non-standard module. See https://pypi.python.org/pypi/tempdir/
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Locally written modules
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 import transcriptm.__init__
 from transcriptm.pipeline import Pipeline as tm_Pipeline  # custom pipeline class.
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-# CLASS CUSTOM HELP FORMATTER
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-class CustomHelpFormatter(argparse.HelpFormatter):
-    ''' This class is a remodelling of `argparse.HelpFormatter`.
-        It is used by being passed as a class, to cmdline.get_argparse(..., formatter_class=CustomHelpFormatter).
-        However, in doing so, our custom class redefines methods that are not part of `argparse.HelpFormatter`'s API. 
-        Therefore there exists the potential for our code to break if these methods 
-        (which are supposed to be a non-public implementation) are remodelled in a newer version of `argparse`.
-    '''
-    def _split_lines(self, text, width): # redefinition.
-        return text.splitlines()
-
-    def _get_help_string(self, action): # redefinition.
-        h = action.help
-        if '%(default)' not in action.help:
-            if action.default != '' and \
-               action.default != [] and \
-               action.default != None :
-                if action.default is not argparse.SUPPRESS:
-                    defaulting_nargs = [argparse.OPTIONAL,
-                                        argparse.ZERO_OR_MORE]
-
-                    if (action.option_strings or action.nargs in defaulting_nargs) :
-                        if not (type(action.default)==str and len(action.default)>50):
-                            if '\n' in h:
-                                lines = h.splitlines()
-                                lines[0] += ' [default: %(default)s]'
-                                h = '\n'.join(lines)
-                            else:
-                                h += ' [default: %(default)s]'
-        if action.required:
-            if '\n' in h:
-                lines = h.splitlines()
-                lines[0] += ' \033[0;32m|REQUIRED\033[00m'
-                h = '\n'.join(lines)
-            else:
-                h += ' \033[0;32m|REQUIRED\033[00m'
-        return h
-
-    def _fill_text(self, text, width, indent): # redefinition.
-        return ''.join([indent + line for line in text.splitlines(True)])
-
+# Functions
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def parser_built_with_ruffus(objTempDir):
     ''' returns a command line parser (of type `argparse.ArgumentParser`) that is built with options specific to our program and `ruffus`.
         Parameters: `objTempDir`: a `tempdir.TempDir` object (specifying a working directory to be used if needed).
-    '''
+        '''
+    class CustomHelpFormatter(argparse.HelpFormatter):
+        ''' This class is a remodelling of `argparse.HelpFormatter`.
+            It is used by being passed as a class, to cmdline.get_argparse(..., formatter_class=CustomHelpFormatter).
+            However, in doing so, our custom class redefines methods that are not part of `argparse.HelpFormatter`'s API. 
+            Therefore there exists the potential for our code to break if these methods 
+            (which are supposed to be a non-public implementation) are remodelled in a newer version of `argparse`.
+            '''
+        def _split_lines(self, text, width): # redefinition.
+            return text.splitlines()
+        def _get_help_string(self, action): # redefinition.
+            h = action.help
+            if '%(default)' not in action.help:
+                if action.default != '' and \
+                   action.default != [] and \
+                   action.default != None :
+                    if action.default is not argparse.SUPPRESS:
+                        defaulting_nargs = [argparse.OPTIONAL,
+                                            argparse.ZERO_OR_MORE]
+                        if (action.option_strings or action.nargs in defaulting_nargs) :
+                            if not (type(action.default)==str and len(action.default)>50):
+                                if '\n' in h:
+                                    lines = h.splitlines()
+                                    lines[0] += ' [default: %(default)s]'
+                                    h = '\n'.join(lines)
+                                else:
+                                    h += ' [default: %(default)s]'
+            if action.required:
+                if '\n' in h:
+                    lines = h.splitlines()
+                    lines[0] += ' \033[0;32m|REQUIRED\033[00m'
+                    h = '\n'.join(lines)
+                else:
+                    h += ' \033[0;32m|REQUIRED\033[00m'
+            return h
+        def _fill_text(self, text, width, indent): # redefinition.
+            return ''.join([indent + line for line in text.splitlines(True)])
+            
 	## Args
     parser = cmdline.get_argparse(description='''
                     ===============================                       
@@ -93,7 +84,7 @@ def parser_built_with_ruffus(objTempDir):
 transcriptm --paired_end sample1-1.fq.gz sample1-2.fq.gz sample2-1.fq.gz sample2-2.fq.gz --metaG_contigs assembly.fa --dir_bins dir_gff
     '''%(transcriptm.__version__), 
     version = "transcriptm v%s"% transcriptm.__version__,
-    formatter_class=CustomHelpFormatter,
+    formatter_class = CustomHelpFormatter,
     ignored_args = ["recreate_database", "key_legend_in_graph","just_print","target_tasks","jobs","use_threads","forced_tasks","touch_files_only","checksum_file_name","flowchart","draw_graph_horizontally","flowchart_format"])
 
     # Options   
@@ -157,24 +148,41 @@ transcriptm --paired_end sample1-1.fq.gz sample1-2.fq.gz sample2-1.fq.gz sample2
     return parser
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+def further_process_args(args):
+    """ performs further validations on `args` (parsed command-line arguments), 
+        and creates additional derived args in that namespace.
+    """
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~0~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~           
+    def valid_SortMeRNA():
+        """ performs cursory validation that the SortMeRNA database is indexed.
+        """
+        if os.path.isdir(os.path.join(args.db_path, "1-SortMeRNA/")) and \
+                not os.path.isdir(os.path.join(args.db_path, '1-SortMeRNA/index')):
+            ### RKR: DEADCODE? (None of these variables are used again).
+            if True:
+                path_rRNA = os.path.join(args.db_path,"1-SortMeRNA/rRNA_databases")
+                path_tRNA= os.path.join(args.db_path,"1-SortMeRNA/tRNA_databases")
+                path_index = os.path.join(args.db_path,"1-SortMeRNA/index")
+            ### END_DEADCODE
+            raise Exception ("No index found for SortMeRNA database.\n Use the cmdline below: \n" + \
+                             "sortmerna/2.0/bin/indexdb_rna --ref path_db1,path_index1:path_db2,path_index2 ")
+            exit(1) #RKR: Is this line needed after raising an exception?
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~           
+    valid_SortMeRNA()
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~           
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def main_prog():
     """ runs the main program for TranscriptM.
         """
     objTempDir = tempdir.TempDir() # Create a `tempdir` object to be used as a program argument default, just in case the user doesn't specify the working directory. This could be handled better.
     parser = parser_built_with_ruffus(objTempDir) # Initialise a command line parser that is configured with options specific to our program and `ruffus`.
     args = parser.parse_args() # Parse the command line.
-    # check if the SortMeRNA database is indexed
-    if os.path.isdir(os.path.join(args.db_path,'1-SortMeRNA/')) and not os.path.isdir(os.path.join(args.db_path,'1-SortMeRNA/index')):
-        path_rRNA = os.path.join(args.db_path,"1-SortMeRNA/rRNA_databases")
-        path_tRNA= os.path.join(args.db_path,"1-SortMeRNA/tRNA_databases")
-        path_index = os.path.join(args.db_path,"1-SortMeRNA/index")
-        raise Exception ('No index found for SortMeRNA database.\n Use the cmdline below: \n sortmerna/2.0/bin/indexdb_rna --ref path_db1,path_index1:path_db2,path_index2 ')
-        exit(1)
-    logger, logging_mutex = cmdline.setup_logging (__name__, args.log_file, args.verbose) # logging.
+    further_process_args(args) # Further argument validation and creation.
+    logger, logging_mutex = cmdline.setup_logging (__name__, args.log_file, args.verbose) # logging. #RKR: Is this dead code?
     pl = tm_Pipeline(args)     # Instantiate a custom Pipeline object.
     pl.pipeline_stages()       # This is the method that defines all the pipelined functions; and issues cmdline.run(...)
-    pl.clear()
+    pl.clear()                 # 
     objTempDir.dissolve()      # ...behind the scenes: shutil.rmtree(self.name)
-    
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 if __name__ == '__main__':
     main_prog()

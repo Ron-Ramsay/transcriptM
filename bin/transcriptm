@@ -1,9 +1,7 @@
 #!/usr/bin/env python
-
-""" Main callable module to run TranscriptM: rapid-throughput pipeline of meta-transcriptomes. 
+""" Main callable module to run TranscriptM: a rapid-throughput pipeline of meta-transcriptomes. 
 	See http://http://transcriptm.tiddlyspot.com/
     """
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Developer's temporary playground
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -11,7 +9,7 @@
 # 4. (a) Created funct valid_adapters_fileloc in further_process_args. (b) Indented nicely the description parameter when calling cmdline.get_argparse."
 # 5. Tidied up some formatting of strings, etc. in parser_built_with_ruffus"
 # 7. In transcriptm, implemented funct valid_paired_end to check that all the paired end files exist."
-#print "*** 8. " 
+print "*** 11: Now reference pipeline.py module class Pipeline as full_tm_pipeline."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -32,7 +30,7 @@ import tempdir  # encapsulates temporary directories which just disappear after 
 # Locally written modules
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 import transcriptm.__init__
-from transcriptm.pipeline import Pipeline as tm_Pipeline  # custom pipeline class.
+from transcriptm.pipeline import full_tm_pipeline  # custom pipeline class.
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Functions
@@ -100,9 +98,7 @@ def parser_built_with_ruffus(objTempDir):
         )
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # General options
-    ###?
-    ###? Can all of the `dest="..."` parameters be removed (since they don't vary from the --argument name)?
-    ###?
+    #? Coding: Can all of the `dest="..."` parameters be removed (since they don't vary from the --argument name)?
     parser._optionals.title = "General options" # Overwrite the hard-coded title 'optional arguments' for this group of arguments, 
                                                 #  because presumably, most of these arguments are not optional.
                                                 # (nb. This call seems to delve behind the class's public interface, so this code has 
@@ -201,7 +197,7 @@ def further_process_args(args):
             if not os.path.isfile(filename):
                 raise Exception("File <{0}> specified in --paired_end does not exist.".format(filename))
                 exit(1)
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
     def valid_adapters_fileloc():
         """ creates a new arg `adaptersFile`, pointing to an expected file location under `db_path`, 
             and tests for the presence of that file.
@@ -219,44 +215,45 @@ def further_process_args(args):
         argsDict['adaptersFile'] = os.path.join(adapters_folder, adapters_basename) 
         # Validate that the file (specified by the newly created variable) exists.
         if not os.path.isfile(args.adaptersFile):
-            raise Exception("The subdirectory `0-Adapters` or the file `%s` does not exist in `%s` (the db_path provided)"
-                            %(os.path.basename(args.adaptersFile), args.db_path))
-            exit(1) # RKR: Is this line needed after raising an exception?
+            raise Exception(
+                "The subdirectory `0-Adapters` or the file `%s` does not exist in `%s` (the db_path provided)"
+                %(os.path.basename(args.adaptersFile), args.db_path))
+            exit(1) #? Is this line needed after raising an exception?
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~           
     def valid_SortMeRNA():
         """ performs cursory validation that the SortMeRNA database is indexed.
         """
         if os.path.isdir(os.path.join(args.db_path, "1-SortMeRNA/")) and \
                 not os.path.isdir(os.path.join(args.db_path, '1-SortMeRNA/index')):
-            ### RKR: DEADCODE? (None of these variables are used again).
+            ###? DEADCODE? (None of these variables are used again).
             if True:
                 path_rRNA = os.path.join(args.db_path,"1-SortMeRNA/rRNA_databases")
                 path_tRNA= os.path.join(args.db_path,"1-SortMeRNA/tRNA_databases")
                 path_index = os.path.join(args.db_path,"1-SortMeRNA/index")
             ### END_DEADCODE
-            raise Exception ("No index found for SortMeRNA database.\n Use the cmdline below: \n" + \
-                             "sortmerna/2.0/bin/indexdb_rna --ref path_db1,path_index1:path_db2,path_index2 ")
-            exit(1) #? RKR: Is this line needed after raising an exception?
+            raise Exception(
+                "No index found for SortMeRNA database.\n Use the cmdline below: \n" + \
+                "sortmerna/2.0/bin/indexdb_rna --ref path_db1,path_index1:path_db2,path_index2 ")
+            exit(1) #? Is this line needed after raising an exception?
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~           
-    ''' Go ahead and perform the processsing. 
-        '''
     valid_paired_end()
     valid_adapters_fileloc()
     valid_SortMeRNA()
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def main_prog():
     """ runs the main program for TranscriptM.
         """
     objTempDir = tempdir.TempDir() # Create a `tempdir` object to be used as a program argument default, just in case the user doesn't specify the working directory. This could be handled better.
     parser = parser_built_with_ruffus(objTempDir) # Initialise a command line parser that is configured with options specific to our program and `ruffus`.
-    args = parser.parse_args() # Parse the command line.
-    further_process_args(args) # Further argument validation and creation.
-    logger, logging_mutex = cmdline.setup_logging (__name__, args.log_file, args.verbose) # logging. #RKR: Is this dead code?
-    pl = tm_Pipeline(args)     # Instantiate a custom Pipeline object.
-    pl.pipeline_stages()       # This is the method that defines all the pipelined functions; and issues cmdline.run(...)
-    pl.clear()                 # 
-    objTempDir.dissolve()      # ...behind the scenes: shutil.rmtree(self.name)
+    args = parser.parse_args()  # Parse the command line.
+    further_process_args(args)  # Further argument validation and creation.
+    logger, logging_mutex = cmdline.setup_logging (__name__, args.log_file, args.verbose) # logging. #? Is this dead code?
+    pl = full_tm_pipeline(args) # Instantiate a custom Pipeline object.
+    pl.pipeline_stages()        # This is the method that defines all the pipelined functions; and issues cmdline.run(...)
+    pl.clear()                  # 
+    objTempDir.dissolve()       # ...behind the scenes: shutil.rmtree(self.name)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 if __name__ == '__main__':
     main_prog()

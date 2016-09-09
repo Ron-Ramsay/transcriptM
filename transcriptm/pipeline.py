@@ -7,7 +7,8 @@
 # 7: Changed version.py to 0.3.3"
 # 7: Removed pipeline.py code that I had previously relocated to transcriptm as funct valid_adapters_fileloc which created argument adaptersFile, as used in pipeline.py function trimmomatic."
 # 8: Use new op_progress function."
-print "*** 10: Restructure Pipeline.__init__."
+# 10: Restructure Pipeline.__init__."
+print "*** 11: (a) Renamed class Pipeline to full_tm_pipeline. (b) encapsulated function rename_files as rename_files_in_dir in function clear."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -38,17 +39,17 @@ import ruffus.cmdline as cmdline
 from monitoring import Monitoring  # implements class `Monitoring`. (Locally-written module).
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Class: Pipeline
+# Class
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-class Pipeline:
-    """
+class full_tm_pipeline:
+    """ a ruffus pipeline implementing all the stages of TranscriptM.
         """
     def __init__(self, args):
-        """
+        """ routines automatically executed upon instantiation of an instance of this class. 
             """
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def determine_ref_genome_phiX():
-            """ Instantiates `self.ref_genome_phiX` (PhiX: reference genome).
+            """ instantiates and validates `self.ref_genome_phiX`: the filepath of the reference genome file (PhiX).
                 """
             self.ref_genome_phiX = os.path.join(self.args.db_path, '2-PhiX/phiX.fa')
             if not os.path.isfile(self.ref_genome_phiX):
@@ -57,7 +58,7 @@ class Pipeline:
                 exit(1)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def determine_list_gff():
-            """ Instantiates `self.list_gff` (gff files).
+            """ instantiates and validates `self.list_gff`: the list of gff files.
                 """
             self.list_gff = list(numpy.sort(self.get_files(self.args.dir_bins , '.gff')))
             if len(set([os.path.basename(x) for x in self.list_gff])) < len(self.list_gff):
@@ -65,7 +66,7 @@ class Pipeline:
                 exit(1)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def determine_alias_pe():
-            """ Populates dictionary `self.alias_pe`: 
+            """ populates dictionary `self.alias_pe`: 
                 index: original filenames (of metatranscriptomic reads), as listed in argument `paired_end`.
                 value: matching working directory filenames (but these filenames will not yet be created).
                        format: `sample-n_R1.fq.gz`, `sample-n_R2.fq.gz`, 
@@ -127,22 +128,22 @@ class Pipeline:
                 """       
             self.logger, self.logging_mutex = cmdline.setup_logging(__name__, args.log_file, args.verbose)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        self.args = args  # store arguments passed.
-        determine_ref_genome_phiX()
-        determine_list_gff()
-        ###! ADD VALIDATION(?): Check an even number of list entries (since in paired-end files come in pairs).
-        determine_alias_pe()
-        determine_prefix_pe()
-        determine_tot_pe()
-        setup_logging()
+        self.args = args             # Store arguments passed.
+        determine_ref_genome_phiX()  # Generate and validate derived argments...
+        determine_list_gff()         #
+        determine_alias_pe()         #
+        determine_prefix_pe()        #
+        determine_tot_pe()           #
+        setup_logging()              # Set up logging.
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # MISCELLANEOUS FUNCTIONS
+    # Helper functions
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    def re_symlink (self,input_file, soft_link_name, logger, logging_mutex):
-        """
-        Helper function: relinks soft symbolic link if necessary
-        """
+    def re_symlink (self, input_file, soft_link_name, logger, logging_mutex):
+        """ (helper): relinks soft symbolic link if necessary.
+            (This function from the ruffus website: http://www.ruffus.org.uk/faq.html?highlight=re_symlink) 
+            """
         # Guard against soft linking to oneself: Disastrous consequences of deleting the original files
         if input_file == soft_link_name:
             logger.debug("Warning: No symbolic link made. You are using the original data directory as the working directory.")
@@ -161,35 +162,34 @@ class Pipeline:
             logger.debug("os.symlink(%s, %s)" % (input_file, soft_link_name))
             #   symbolic link relative to original directory so that the entire path
             #       can be moved around with breaking everything
-        os.symlink( os.path.relpath(os.path.abspath(input_file), os.path.abspath(os.path.dirname(soft_link_name))), soft_link_name)
-    
-        
-    def get_files(self,directory,extension):
-        """
-        Helper function: list files with a specific extension in a directory and its subdirectories
-        """
-        list_files=[] 
+        os.symlink(
+            os.path.relpath(os.path.abspath(input_file), os.path.abspath(os.path.dirname(soft_link_name))), 
+            soft_link_name)
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    def get_files(self, directory, extension):
+        """ (helper): returns a list of files with a specific extension in a directory and its subdirectories.
+            """
+        list_files = [] 
         for root, dirs, files in os.walk(directory):
             for f in files:
                 if f.endswith(extension):
                     list_files.append(os.path.join(root, f))
         return list_files
-    
-    def has_index(self,f,list_extension):
-        """
-        Helper function: check if a file f has index (if its directory also contains files ending with extensions given in a list)
-        """
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    def has_index(self, f, list_extension):
+        """ (helper): check if a file f has index 
+            (if its directory also contains files ending with extensions given in a list).
+            """
         index=True 
         for ext in list_extension:
             if not os.path.exists(f+ext):
                 index=False
                 break
         return index
-    
-    def longest_common_substring(self,S1, S2):
-        """
-        Helper function: find the longest common substring between 2 strings
-        """
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    def longest_common_substring(self, S1, S2):
+        """ (helper): returns the longest common substring between 2 strings.
+            """
         M = [[0]*(1+len(S2)) for i in range(1+len(S1))]
         longest, x_longest = 0, 0
         for x in range(1,1+len(S1)):
@@ -202,18 +202,19 @@ class Pipeline:
                 else:
                     M[x][y] = 0
         return S1[x_longest-longest: x_longest]
-        
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def op_progress(self, name_sample, p2, p3, p4, p5, p6):
         ''' prints out the provided parameters as a line formated in standard column widths.
             This function probably belongs in module Monitoring, but is put here until that is sorted out.
             '''
         print "{0:20} {1:16} {2:16} {3:20} {4:>12}  {5:>8}".format(name_sample, p2, p3, p4, p5, p6)
-        
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # PIPELINE STAGES FUNCTION
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #            
-    def pipeline_stages(self): 
-        
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Pipeline Stages
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    def pipeline_stages(self):
+        """ defines all the pipelined functions and runs them.
+            """
         mode = 0
         if self.args.sortmerna_precomputed: mode = 4
         
@@ -221,10 +222,11 @@ class Pipeline:
         def testfunction ():
             pass
             
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # PIPELINE: STEP N_1
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # Create symbolic link of inputs files in the working directory
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # PIPELINE: STEP N_1
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Create symbolic link of inputs files in the working directory
+        
         @mkdir(self.args.working_dir)
         @originate(self.alias_pe.keys(), self.logger, self.logging_mutex)
         def symlink_to_wd_metaT (soft_link_name, logger, logging_mutex):
@@ -267,10 +269,11 @@ class Pipeline:
                     logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
                 self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
             
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # PIPELINE: STEP N_2
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #    
-    # First step in the QC process of the raw reads: trimming based on length and quality score     
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # PIPELINE: STEP N_2
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # First step in the QC process of the raw reads: trimming based on length and quality score     
+
         @collate(symlink_to_wd_metaT,
                  regex("R[12].fq.gz$"),
                  ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"],"trimmomatic.log",
@@ -305,7 +308,6 @@ class Pipeline:
                     logger.info("Trim and remove adapters of paired reads of %(input_files)s" % locals())
                     logger.debug("trimmomatic: cmdline\n"+ cmd)
                 
-
                 extern.run(cmd)
                 
                 #  ~~~~ monitoring: count of reads  ~~~~ #  
@@ -315,10 +317,10 @@ class Pipeline:
                 processed_reads = stat.count_processed_reads(log)
                 self.op_progress(name_sample,'trimming','Trimmomatic','raw reads',str(processed_reads),stat.get_tot_percentage(processed_reads))
                   
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # PIPELINE: STEP N_3
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #    
-    # Second step in the QC process: remove phiX contamination
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # PIPELINE: STEP N_3
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Second step in the QC process: remove phiX contamination
         @subdivide(trimmomatic,formatter(r"(.+)/(?P<BASE>.*)P1.fq.gz"),["{path[0]}/phiX.{BASE[0]}P1.bam",
                                                                         "{path[0]}/phiX.{BASE[0]}U1.bam",
                                                                         "{path[0]}/phiX.{BASE[0]}U2.bam"], self.logger, self.logging_mutex)
@@ -338,7 +340,6 @@ class Pipeline:
                     logger.info("Map reads [%s] against phiX genome"%(','.join(input_files)))
                     logger.debug("phiX_map: cmdline\n"+ cmd)
                 extern.run(cmd)
-            
         
         @transform(phiX_map, suffix(".bam"),".txt",self.logger, self.logging_mutex)
         def phiX_ID(input_files,output_files,logger, logging_mutex):
@@ -351,7 +352,6 @@ class Pipeline:
                     logger.info("Extract ID of phiX reads in %s" %(input_files))
                     logger.debug("phiX_ID: cmdline\n"+ cmd)
                 extern.run(cmd)
-
         
         @collate(phiX_ID,formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),'{path[0]}/{BASE[0]}phiX_ID.log','{BASE[0]}',self.logger, self.logging_mutex)
         def phiX_concat_ID(input_files, output_file,basename,logger, logging_mutex):
@@ -402,11 +402,11 @@ class Pipeline:
                         logger.debug("phiX_extract: cmdline\n"+ cmd)
                     extern.run(cmd) 
 
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # PIPELINE: STEP N_4
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Third step in the QC process: remove rRNA, tRNA ...
         
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # PIPELINE: STEP N_4
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #    
-    # Third step in the QC process: remove rRNA, tRNA ...
         @subdivide(phiX_extract,formatter(), "{path[0]}/{basename[0]}_non_ncRNA.fq",
                    "{path[0]}/{basename[0]}_ncRNA.fq",self.logger, self.logging_mutex)
         def sortmerna (input_files, output_files, ncRNA_files,logger, logging_mutex):    
@@ -424,11 +424,11 @@ class Pipeline:
                     logger.debug("sortmerna: cmdline\n"+ cmd)
                 extern.run(cmd)
     
-    
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # PIPELINE: STEP N_5
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ # 
-    # mapping the reads to reference genome       
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # PIPELINE: STEP N_5
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # mapping the reads to reference genome       
+        
         #-move the singleton (generated with sortmerna) with the single ones
         @collate(sortmerna,regex(r"trimm_.*"),["concat_paired_R1.fq","concat_paired_R2.fq","concat_single.fq"],
                  "ID_single.txt", self.logger, self.logging_mutex)
@@ -555,10 +555,10 @@ class Pipeline:
                 mapped_reads_f = stat.count_mapping_reads(flagstat,False)
                 self.op_progress(name_sample, '.bam filter', 'BamM filter', 'mapped reads', str(mapped_reads_f), stat.get_tot_percentage(mapped_reads_f))
 
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # PIPELINE: STEP N_6 (normalized_cov)
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ # 
-    # coverage if bins provided
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # PIPELINE: STEP N_6 (normalized_cov)
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # coverage if bins provided
         if self.args.no_mapping_filter :  
             bam_file = map2ref 
         else: 
@@ -568,9 +568,9 @@ class Pipeline:
             """
             Dirseq (compute coverage values) +  coverage2normalized_cov
             """
-    #                                                                       #
-    ## add control! contigs in gff files must be present in metaG_contigs  ##
-    #                   
+        #                                                                       #
+        ## add control! contigs in gff files must be present in metaG_contigs  ##
+        #                   
             lib_size= int(subprocess.check_output("samtools view -c "+input_file, shell=True))
             #f = open(lib_size_log, 'w')
             #f.write(str(lib_size)) 
@@ -598,10 +598,11 @@ class Pipeline:
                     logger.debug("bam2normalized_cov: cmdline\n"+ cmd1)
                 extern.run(cmd1)                
         
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # PIPELINE: STEP N_6 BIS (raw count)
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ # 
-    # raw count if bins provided
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # PIPELINE: STEP N_6 BIS (raw count)
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # raw count if bins provided
+        
         if self.args.no_mapping_filter :  
             bam_file = map2ref 
         else: 
@@ -623,11 +624,11 @@ class Pipeline:
                     logger.debug("bam2raw_count: cmdline\n"+ cmd)                                       
                 extern.run(cmd)        
 
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # PIPELINE: STEP N_7 (normalized_cov table)
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # PIPELINE: STEP N_7 (normalized_cov table)
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ # 
-    # Concatenate all the normalized_cov results in a table
+        # Concatenate all the normalized_cov results in a table
         @mkdir(self.args.output_dir)
         @merge(bam2normalized_cov,os.path.join(self.args.output_dir,os.path.basename(self.args.output_dir)+'_NORM_COVERAGE.csv'),self.logger, self.logging_mutex)
         def transcriptM_table (input_files, output_file, logger, logging_mutex): 
@@ -684,11 +685,11 @@ class Pipeline:
             with logging_mutex:     
                 logger.info("Create table that contains normalized_cov values for each gene of each bin given as input for the different samples: %s"%(','.join(self.prefix_pe.values())))    
             
-    
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # PIPELINE: STEP N_7 BIS (raw count table)
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ # 
-    # Concatenate all the raw count in a table
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # PIPELINE: STEP N_7 BIS (raw count table)
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+        # Concatenate all the raw count in a table
         @mkdir(self.args.output_dir)
         @merge(bam2raw_count,os.path.join(self.args.output_dir,os.path.basename(self.args.output_dir)+'_COUNT.csv'),self.logger, self.logging_mutex)
         def raw_count_table (input_files, output_file, logger, logging_mutex): 
@@ -744,11 +745,11 @@ class Pipeline:
             with logging_mutex:     
                 logger.info("Create table that contains raw count values for each gene of each bin given as input for the different samples: %s"%(','.join(self.prefix_pe.values())))    
     
-    
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # PIPELINE: TRACE FILE N_1
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # Create the first output: a fastqc report of raw DATA
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # PIPELINE: TRACE FILE N_1
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Create the first output: a fastqc report of raw DATA
+        
         subdir_1= os.path.join(self.args.output_dir,"FastQC_raw")
         # clean the dir (of previous run output)
         try:
@@ -775,10 +776,11 @@ class Pipeline:
                 logger.debug("view_raw_data: cmdline\n"+cmd)
             extern.run(cmd)
     
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # PIPELINE: TRACE FILE N_2
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # Create the second output: a fastqc report of processed DATA
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # PIPELINE: TRACE FILE N_2
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+        # Create the second output: a fastqc report of processed DATA
         subdir_2 = os.path.join(self.args.output_dir,"FastQC_processed")
         # clean the dir (of previous run output)
         try:
@@ -806,10 +808,11 @@ class Pipeline:
                 logger.debug("view_processed_data: cmdline\n"+cmd)
             extern.run(cmd)
 
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # PIPELINE:TRACE FILE N_3
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ # 
-    # get monitoring data
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # PIPELINE:TRACE FILE N_3
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # get monitoring data
+        
         subdir_3= os.path.join(self.args.output_dir,"log/")
         # clean the dir (of previous run output)
         try:
@@ -898,11 +901,11 @@ class Pipeline:
                 logger.debug("concatenate_logtables: cmdline\n"+cmd)                
             extern.run(cmd)  
             
-            
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # PIPELINE:TRACE FILE N_4
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ # 
-    # save the processed metaT reads
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # PIPELINE:TRACE FILE N_4
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # save the processed metaT reads
+        
         subdir_4 = os.path.join(self.args.output_dir,"processed_reads/")
         # clean the dir (of previous run output)
         try:
@@ -929,46 +932,54 @@ class Pipeline:
                     logger.debug("save_processed_reads: cmdline\n"+cmd)
                 extern.run(cmd)
     
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # PIPELINE: RUN
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #         
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # PIPELINE: RUN
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         cmdline.run(self.args)
-        
     
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # CLEAR FUNCTION: rename files ...
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #            
-    def rename_files(self, directory):
-    # rename all files in a directory with their 'real name'
-        for f in os.listdir(directory):
-            f_new=os.path.join(directory,string.replace(f,f.split('_')[0],self.prefix_pe[f.split('_')[0]]) )   
-            f= os.path.join(directory ,f)          
-            os.rename(f,f_new)        
-        
-    def clear(self):  
-    # rename logfile
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    def clear(self):
+        """ ??? Does some kinds of clean up?: Renames files. Removes directories.
+            """
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        def rename_files_in_dir(directory):
+            """ renames all files in `directory` with their 'real name'. (???)
+                It seems that first part of the filenames, i.e. up to the first "_",
+                are replaced by the first part (up to the first "_") of `self.prefix_pe`.
+                """
+            for f in os.listdir(directory): # for all entries in the directory, as strings:
+                f_new=os.path.join(directory,string.replace(f,f.split('_')[0],self.prefix_pe[f.split('_')[0]]) )   
+                f= os.path.join(directory ,f)          
+                os.rename(f, f_new)
+                #? Replace with this:
+                #f_old = os.path.join(directory, f)          
+                #f_new = os.path.join(directory, string.replace(f, f.split('_')[0], self.prefix_pe[f.split('_')[0]]))
+                #os.rename(f_old, f_new)                
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+        # rename logfile
         log_dir = os.path.join(self.args.output_dir,"log/")
-        self.rename_files(log_dir)          
-    # rename fastqc report
+        self.rename_files_in_dir(log_dir)          
+        # rename fastqc report
         fastqc_raw = os.path.join(self.args.output_dir,"FastQC_raw/")
-        self.rename_files(fastqc_raw) 
-    # rename fastqc report
+        self.rename_files_in_dir(fastqc_raw) 
+        # rename fastqc report
         fastqc_processed = os.path.join(self.args.output_dir,"FastQC_processed/")
-        self.rename_files(fastqc_processed)
-    # rename processed reads
+        self.rename_files_in_dir(fastqc_processed)
+        # rename processed reads
         processed_dir =os.path.join(self.args.output_dir,"processed_reads/")
-        self.rename_files(processed_dir)
+        self.rename_files_in_dir(processed_dir)
+        
+        ##? Replace above lines with this:
+        ## Rename logfile, fastqc report, fastqc report, processed reads:
+        #for dirName in ["log/", "FastQC_raw/", "FastQC_processed/", "processed_reads/"]:
+        #    rename_files_in_dir(os.path.join(self.args.output_dir, dirName))        
+        
         # clean dir
         reads_distrib_dir = os.path.join(self.args.output_dir,"reads_distribution/")
         try:
             shutil.rmtree(reads_distrib_dir)
         except OSError:
             pass   
-            
-            
-            
-            
-            
-            
-            

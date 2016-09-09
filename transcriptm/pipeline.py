@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
-print "*** 6: Documented imports; removed ipython import; made ruffus imports specific."
+#print "*** 6: Documented imports; removed ipython import; made ruffus imports specific."
+print "*** 7: Removed pipeline.py code that I had previously relocated to transcriptm as funct valid_adapters_fileloc which created argument adaptersFile, as used in pipeline.py function trimmomatic."
+print "*** 7: Changed version.py to 0.3.3"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -33,20 +35,12 @@ from monitoring import Monitoring  # implements class `Monitoring`. (Locally-wri
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # CLASS PIPELINE
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-class Pipeline :
+class Pipeline:
+    
     def __init__(self,args):
+        
         self.args=args
         
-        ### db
-        # adapters
-        if self.args.adapters=='truseq':
-            self.adapters= os.path.join(self.args.db_path,'0-Adapters/TruSeq3-PE-2.fa')
-        elif self.args.adapters=='nextra':
-            self.adapters= os.path.join(self.args.db_path,'0-Adapters/NexteraPE-PE.fa')
-        if not os.path.isfile(self.adapters):
-            raise Exception ("The subdirectory 0-Adapters/ or the file %s does not exist in %s (db_path provided)"
-                            %(os.path.basename(self.adapters),self.args.db_path))
-            exit(1)
         # PhiX: reference genome 
         self.ref_genome_phiX= os.path.join(self.args.db_path,'2-PhiX/phiX.fa')
         if not os.path.isfile(self.ref_genome_phiX):
@@ -246,7 +240,7 @@ class Pipeline :
                 cmd += "%s " % (output_file[2])
                 cmd += "%s " % (output_file[1])
                 cmd += "%s " % (output_file[3])
-                cmd += "ILLUMINACLIP:%s:2:30:10         " % (self.adapters)
+                cmd += "ILLUMINACLIP:%s:2:30:10         " % (self.args.adaptersFile)
                 cmd += "LEADING:%d " % (self.args.min_qc)
                 cmd += "SLIDINGWINDOW:4:%d " % (self.args.min_avg_qc)
                 cmd += "TRAILING:%d " % (self.args.min_qc)

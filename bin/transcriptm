@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 
 """ Main callable module to run TranscriptM: rapid-throughput pipeline of meta-transcriptomes. 
-	  See http://http://transcriptm.tiddlyspot.com/
-"""
-#print "3: Created funct further_process_args to run valid_SortMeRNA. Encapsulated funct CustomHelpFormatter into parser_built_with_ruffus."
+	See http://http://transcriptm.tiddlyspot.com/
+    """
+
+    #print "3: Created funct further_process_args to run valid_SortMeRNA. Encapsulated funct CustomHelpFormatter into parser_built_with_ruffus."
 #print "4. (a) Created funct valid_adapters_fileloc in further_process_args. (b) Indented nicely the description parameter when calling cmdline.get_argparse."
-print "5. Tidied up some formatting of strings, etc. in parser_built_with_ruffus"
+#print "5. Tidied up some formatting of strings, etc. in parser_built_with_ruffus"
+print "*** 7. In transcriptm, implemented funct valid_paired_end to check that all the paired end files exist."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -178,16 +180,25 @@ def parser_built_with_ruffus(objTempDir):
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     return parser
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def further_process_args(args):
     """ performs further validations on `args` (parsed command-line arguments), 
         and creates additional derived args in that namespace.
-    """
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
-    def valid_adapters_fileloc():
-        """ create a new arg `adaptersFile`, pointing to an expected file location under `db_path`, 
-            and test for the presence of that file.
         """
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+    def valid_paired_end():
+        """ checks that all the paired end files exist.
+            """
+        for filename in args.paired_end:
+            if not os.path.isfile(filename):
+                raise Exception("File <{0}> specified in --paired_end does not exist.".format(filename))
+                exit(1)
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+    def valid_adapters_fileloc():
+        """ creates a new arg `adaptersFile`, pointing to an expected file location under `db_path`, 
+            and tests for the presence of that file.
+            """
         argsDict = vars(args) # working variable to refer to `args` to update it.
         ''' Use this working variable to update the `args` Namespace object as a virtual dictionary. 
             i.e. it is synonymous with `args._dict__`
@@ -222,9 +233,11 @@ def further_process_args(args):
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~           
     ''' Go ahead and perform the processsing. 
         '''
+    valid_paired_end()
     valid_adapters_fileloc()
     valid_SortMeRNA()
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~           
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def main_prog():
     """ runs the main program for TranscriptM.

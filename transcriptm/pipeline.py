@@ -1,32 +1,38 @@
 #!/usr/bin/env python
 
+print "*** 6: Documented imports; removed ipython import; made ruffus imports specific."
 
-# lib
-import os
-from ruffus import *
-import extern
-import IPython
-import numpy
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Python Standard Library modules
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+import os            # miscellaneous operating system interfaces. (Python Standard Library module).
+import subprocess    # spawn new processes, connect to their input/output/error pipes, and obtain their return codes. (Python Standard Library module).
+import tempfile      # generates temporary files and directories. works on all supported platforms. (Python Standard Library module).
+import csv           # Comma Separated Values file reading and writing. (Python Standard Library module).
+import re            # regular expression operations. (Python Standard Library module).
+import string        # common string operations. (Python Standard Library module).
+import collections   # high-performance container datatypes. (Python Standard Library module).
+import shutil        # high-level file operations. (Python Standard Library module).
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# External, non-standard modules
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+import extern        # opinionated version of Python's `subprocess`. (See https://pypi.python.org/pypi/extern/0.1.0)
+import numpy         # array processing for numbers, strings, records, and objects. (Non-standard module. See http://www.numpy.org/).
+# ruffus:            # light-weight computational pipeline management. (Non-standard module. See http://www.ruffus.org.uk).
+from ruffus import collate, follows, merge, originate, subdivide, transform  # ruffus decorators.
+from ruffus import suffix, regex, formatter, add_inputs                      # ruffus filter / indicators.
+from ruffus import active_if, mkdir                                          # ruffus other.
 import ruffus.cmdline as cmdline
-import subprocess
-import tempfile
-import csv
-import re
-import string
-import collections
-import shutil
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Locally written modules
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+from monitoring import Monitoring  # implements class `Monitoring`. (Locally-written module).
 
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-# LOCAL IMPORT
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-from monitoring import Monitoring
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # CLASS PIPELINE
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 class Pipeline :
     def __init__(self,args):
         self.args=args

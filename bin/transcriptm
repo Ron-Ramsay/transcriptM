@@ -3,8 +3,9 @@
 """ Main callable module to run TranscriptM: rapid-throughput pipeline of meta-transcriptomes. 
 	  See http://http://transcriptm.tiddlyspot.com/
 """
-
-print "rkr: test 3"
+#print "3: Created funct further_process_args to run valid_SortMeRNA. Encapsulated funct CustomHelpFormatter into parser_built_with_ruffus."
+#print "4. (a) Created funct valid_adapters_fileloc in further_process_args. (b) Indented nicely the description parameter when calling cmdline.get_argparse."
+print "5. Tidied up some formatting of strings, etc. in parser_built_with_ruffus"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -34,6 +35,7 @@ def parser_built_with_ruffus(objTempDir):
     ''' returns a command line parser (of type `argparse.ArgumentParser`) that is built with options specific to our program and `ruffus`.
         Parameters: `objTempDir`: a `tempdir.TempDir` object (specifying a working directory to be used if needed).
         '''
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     class CustomHelpFormatter(argparse.HelpFormatter):
         ''' This class is a remodelling of `argparse.HelpFormatter`.
             It is used by being passed as a class, to cmdline.get_argparse(..., formatter_class=CustomHelpFormatter).
@@ -70,32 +72,44 @@ def parser_built_with_ruffus(objTempDir):
             return h
         def _fill_text(self, text, width, indent): # redefinition.
             return ''.join([indent + line for line in text.splitlines(True)])
-            
-	## Args
-    parser = cmdline.get_argparse(description='''
-                    ===============================                       
-                    |       transcriptM v%s      |
-                    ===============================    
-
-   -------------------------------------------------------------------------   
-       Process metatranscriptomic data and complete metagenomics analysis
-   ------------------------------------------------------------------------- 
-   e.g. usage:
-transcriptm --paired_end sample1-1.fq.gz sample1-2.fq.gz sample2-1.fq.gz sample2-2.fq.gz --metaG_contigs assembly.fa --dir_bins dir_gff
-    '''%(transcriptm.__version__), 
-    version = "transcriptm v%s"% transcriptm.__version__,
-    formatter_class = CustomHelpFormatter,
-    ignored_args = ["recreate_database", "key_legend_in_graph","just_print","target_tasks","jobs","use_threads","forced_tasks","touch_files_only","checksum_file_name","flowchart","draw_graph_horizontally","flowchart_format"])
-
-    # Options   
-    parser._optionals.title = "Arguments"
-    parser.add_argument("--paired_end",nargs="+", dest="paired_end", help="Input files: paired sequences files of raw metatranscriptomics reads (.fq.gz format)\n  e.g. --paired_end sample1_1.fq.gz sample1_2.fq.gz sample2_1.fq.gz sample2_2.fq.gz",required=True)
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Instantiate the parser.
+    parser = cmdline.get_argparse(
+        description = '\n' \
+            '                    ==============================                           \n' \
+            '                           TranscriptM v{0}                                  \n' \
+            '                    ==============================                           \n' \
+            '                                                                             \n' \
+            '   ------------------------------------------------------------------------- \n' \
+            '       Process metatranscriptomic data and complete metagenomics analysis    \n' \
+            '   ------------------------------------------------------------------------- \n' \
+            '   e.g. usage:                                                               \n' \
+            'transcriptm --paired_end sample1-1.fq.gz sample1-2.fq.gz sample2-1.fq.gz sample2-2.fq.gz --metaG_contigs assembly.fa --dir_bins dir_gff' \
+            .format(transcriptm.__version__), 
+        version = "transcriptm v{0}".format(transcriptm.__version__),
+        formatter_class = CustomHelpFormatter,
+        ignored_args = ["recreate_database", "key_legend_in_graph", "just_print", "target_tasks", "jobs",
+                        "use_threads", "forced_tasks", "touch_files_only", "checksum_file_name", 
+                        "flowchart", "draw_graph_horizontally", "flowchart_format"]
+        )
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # General options
+    parser._optionals.title = "General options" # Overwrite the hard-coded title 'optional arguments' for this group of arguments, 
+                                                #  because presumably, most of these arguments are not optional.
+                                                # (nb. This call seems to delve behind the class's public interface, so this code has 
+                                                #  the potential to break if the underlying implementation is changed in the future).
+    parser.add_argument("--paired_end", nargs="+", dest="paired_end", 
+                        help="Input files: paired sequences files of raw metatranscriptomics reads (.fq.gz format)\n" + \
+                             "e.g. --paired_end sample1_1.fq.gz sample1_2.fq.gz sample2_1.fq.gz sample2_2.fq.gz", 
+                        required=True)
     parser.add_argument("--sortmerna_precomputed", dest="sortmerna_precomputed", help="Skip the steps up to and including SortMeRNA")
-    parser.add_argument("--metaG_contigs", dest="metaG_contigs", help="All contigs from the reference metagenome in a fasta file",required=True)
-    parser.add_argument("--dir_bins", dest="dir_bins", help="Directory which contains several annotated population genomes (bins)\n -> gff format, the others files would be ignored",required=True)
+    parser.add_argument("--metaG_contigs", dest="metaG_contigs", help="All contigs from the reference metagenome in a fasta file", required=True)
+    parser.add_argument("--dir_bins", dest="dir_bins", help="Directory which contains several annotated population genomes (bins)\n" + \
+                        "-> gff format, the others files would be ignored",
+                        required=True)
     parser.add_argument("--threads", dest="threads", help="Number of threads to use", default=20, type=int)
-    
-    # check if the db is an environment variable
+    ### General option: TranscriptM database path:
+    # Check if the db is an environment variable.
     db_path=None    
     try :
         db_path= os.environ['TRANSCRIPTM_DATABASE']
@@ -106,12 +120,13 @@ transcriptm --paired_end sample1-1.fq.gz sample1-2.fq.gz sample2-1.fq.gz sample2
     else :
         parser.add_argument("--db_path", dest="db_path", help="Directory which contains the TranscriptM databases",required=True)
     parser.add_argument("--output_dir", dest="output_dir", help="Output directory ", default='TranscriptM_output')
-    
     ### General option: temporary working directory:
     ''' This could be handled better. The default does not need to be and should not be defined here. '''
-    parser.add_argument("--working_dir", dest="working_dir", help="Working directory (dynamically created if not specified)", default=objTempDir.name)
-	
-    # Trimmomatic
+    parser.add_argument("--working_dir", dest="working_dir", 
+                        help="Working directory (dynamically created if not specified)", 
+                        default=objTempDir.name)
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Trimmomatic options
     trimm_args=parser.add_argument_group('Trimmomatic options')
     trimm_args.add_argument('--adapters', help="Type of adapters to clip ", choices=['nextera', 'truseq'],default= 'truseq')
     trimm_args.add_argument('--min_len', help="Minimum required length of read ", type=int, default = 30)
@@ -120,39 +135,76 @@ transcriptm --paired_end sample1-1.fq.gz sample1-2.fq.gz sample2-1.fq.gz sample2
     trimm_args.add_argument('--min_qc', help="Minimum quality score for leading and trailing bases ", type=int, default = 20)
     trimm_args.add_argument('--crop', help="Cut read to a specific length ", type=int, default = 10000)
     trimm_args.add_argument('--headcrop', help="Cut specified number of bases from start of read ", type=int, default = 0)
-     
-    # SortMeRNA
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # SortMeRNA options
     sortmerna_args=parser.add_argument_group('SortMeRNA options')    
     if db_path:
-        path_rRNA = os.path.join(db_path,"1-SortMeRNA/rRNA_databases")
-        path_tRNA= os.path.join(db_path,"1-SortMeRNA/tRNA_databases")
-        path_index = os.path.join(db_path,"1-SortMeRNA/index")
-        db_smr = '%s/silva-bac-16s-id90.fasta,%s/silva-bac-16s-db:%s/silva-bac-23s-id98.fasta,%s/silva-bac-23s-db:'\
-        '%s/silva-arc-16s-id95.fasta,%s/silva-arc-16s-db:%s/silva-arc-23s-id98.fasta,%s/silva-arc-23s-db:'\
-        '%s/silva-euk-18s-id95.fasta,%s/silva-euk-18s-db:%s/silva-euk-28s-id98.fasta,%s/silva-euk-28s:'\
-        '%s/rfam-5s-database-id98.fasta,%s/rfam-5s-db:%s/rfam-5.8s-database-id98.fasta,%s/rfam-5.8s-db:'\
-        '%s/rfam-alpha_tmRNA.fa,%s/rfam-alpha_tmRNA-db:%s/rfam-beta_tmRNA.fa,%s/rfam-beta_tmRNA-db:'\
-        '%s/rfam-cyano_tmRNA.fa,%s/rfam-cyano_tmRNA-db:%s/rfam-mt_tmRNA.fa,%s/rfam-mt_tmRNA-db:'\
-        '%s/rfam-tmRNA.fa,%s/rfam-tmRNA-db:%s/rfam-tRNA.fa,%s/rfam-tRNA-db:'\
-        '%s/rfam-tRNA_Sec.fa,%s/rfam-tRNA_Sec-db'%((path_rRNA,path_index)*8+(path_tRNA,path_index)*7)
-        sortmerna_args.add_argument('--path_db_smr',help="Path to databases and index\n e.g. path_db1,path_index1:path_db2,path_index2 [default: rRNA and tRNA db]\n NB: index must be created with the script sortmerna/2.0/bin/indexdb_rna",default = db_smr)
-    else :
-        sortmerna_args.add_argument('--path_db_smr',help="Path to databases and index\n e.g. path_db1,path_index1:path_db2,path_index2\n NB: index must be created with the script sortmerna/2.0/bin/indexdb_rna",required=True)
-
-    # Mapping: BamM filter
+        path_rRNA = os.path.join(db_path, "1-SortMeRNA/rRNA_databases")
+        path_tRNA= os.path.join(db_path, "1-SortMeRNA/tRNA_databases")
+        path_index = os.path.join(db_path, "1-SortMeRNA/index")
+        db_smr = \
+            '%s/silva-bac-16s-id90.fasta,%s/silva-bac-16s-db:'\
+            '%s/silva-bac-23s-id98.fasta,%s/silva-bac-23s-db:'\
+            '%s/silva-arc-16s-id95.fasta,%s/silva-arc-16s-db:'\
+            '%s/silva-arc-23s-id98.fasta,%s/silva-arc-23s-db:'\
+            '%s/silva-euk-18s-id95.fasta,%s/silva-euk-18s-db:'\
+            '%s/silva-euk-28s-id98.fasta,%s/silva-euk-28s:'\
+            '%s/rfam-5s-database-id98.fasta,%s/rfam-5s-db:'\
+            '%s/rfam-5.8s-database-id98.fasta,%s/rfam-5.8s-db:'\
+            '%s/rfam-alpha_tmRNA.fa,%s/rfam-alpha_tmRNA-db:'\
+            '%s/rfam-beta_tmRNA.fa,%s/rfam-beta_tmRNA-db:'\
+            '%s/rfam-cyano_tmRNA.fa,%s/rfam-cyano_tmRNA-db:'\
+            '%s/rfam-mt_tmRNA.fa,%s/rfam-mt_tmRNA-db:'\
+            '%s/rfam-tmRNA.fa,%s/rfam-tmRNA-db:'\
+            '%s/rfam-tRNA.fa,%s/rfam-tRNA-db:'\
+            '%s/rfam-tRNA_Sec.fa,%s/rfam-tRNA_Sec-db'\
+            % ((path_rRNA, path_index)*8+(path_tRNA, path_index)*7)
+        sortmerna_args.add_argument('--path_db_smr', 
+            help="Path to databases and index\n" + \
+                 "e.g. path_db1,path_index1:path_db2,path_index2 [default: rRNA and tRNA db]\n" + \
+                 "NB: index must be created with the script sortmerna/2.0/bin/indexdb_rna",
+            default=db_smr)
+    else:
+        sortmerna_args.add_argument('--path_db_smr', 
+            help="Path to databases and index\n e.g. path_db1,path_index1:path_db2,path_index2\n" + \
+                 "NB: index must be created with the script sortmerna/2.0/bin/indexdb_rna",
+            required=True)
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Mapping options (BamM filter)
     mapping_args=parser.add_argument_group('Mapping options (BamM filter)')
-    mapping_args.add_argument('--percentage_id', type=float, dest='percentage_id', help=' Minimum allowable percentage base identity of a mapped read', default=0.97)
+    mapping_args.add_argument('--percentage_id', type=float, dest='percentage_id', help='Minimum allowable percentage base identity of a mapped read', default=0.97)
     mapping_args.add_argument('--percentage_aln', type=float, dest='percentage_aln', help='Minimum allowable percentage read bases mapped', default=0.95)
     mapping_args.add_argument('--no_mapping_filter',  action="store_true", dest='no_mapping_filter', help='Do not adjust the mapping stringency by filtering alignments', default=False)
-    
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     return parser
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def further_process_args(args):
     """ performs further validations on `args` (parsed command-line arguments), 
         and creates additional derived args in that namespace.
     """
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~0~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~           
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+    def valid_adapters_fileloc():
+        """ create a new arg `adaptersFile`, pointing to an expected file location under `db_path`, 
+            and test for the presence of that file.
+        """
+        argsDict = vars(args) # working variable to refer to `args` to update it.
+        ''' Use this working variable to update the `args` Namespace object as a virtual dictionary. 
+            i.e. it is synonymous with `args._dict__`
+            ref. documentation at https://docs.python.org/2.7/library/functions.html#vars
+            '''
+        # Get the folder where the adapters file should exist.
+        adapters_folder = os.path.join(args.db_path, "0-Adapters") 
+        # Select the type of filename, based on user parameter `adapters`.
+        adapters_basename = {'truseq':'TruSeq3-PE-2.fa', 'nextera':'NexteraPE-PE.fa'}.get(args.adapters) 
+        # Creation of new arg:
+        argsDict['adaptersFile'] = os.path.join(adapters_folder, adapters_basename) 
+        # Validate that the file (specified by the newly created variable) exists.
+        if not os.path.isfile(args.adaptersFile):
+            raise Exception("The subdirectory `0-Adapters` or the file `%s` does not exist in `%s` (the db_path provided)"
+                            %(os.path.basename(args.adaptersFile), args.db_path))
+            exit(1) # RKR: Is this line needed after raising an exception?
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~           
     def valid_SortMeRNA():
         """ performs cursory validation that the SortMeRNA database is indexed.
         """
@@ -168,6 +220,9 @@ def further_process_args(args):
                              "sortmerna/2.0/bin/indexdb_rna --ref path_db1,path_index1:path_db2,path_index2 ")
             exit(1) #RKR: Is this line needed after raising an exception?
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~           
+    ''' Go ahead and perform the processsing. 
+        '''
+    valid_adapters_fileloc()
     valid_SortMeRNA()
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~           
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

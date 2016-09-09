@@ -1,8 +1,12 @@
 #!/usr/bin/env python
 
-#print "*** 6: Documented imports; removed ipython import; made ruffus imports specific."
-print "*** 7: Removed pipeline.py code that I had previously relocated to transcriptm as funct valid_adapters_fileloc which created argument adaptersFile, as used in pipeline.py function trimmomatic."
-print "*** 7: Changed version.py to 0.3.3"
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Developer's temporary playground
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# 6: Documented imports; removed ipython import; made ruffus imports specific."
+# 7: Changed version.py to 0.3.3"
+# 7: Removed pipeline.py code that I had previously relocated to transcriptm as funct valid_adapters_fileloc which created argument adaptersFile, as used in pipeline.py function trimmomatic."
+print "*** 8: Use new op_progress function."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -80,10 +84,10 @@ class Pipeline:
             for i in range(int(len(self.args.paired_end)/2)) :
                 count = int(subprocess.check_output("zcat %s | wc -l " %(self.args.paired_end[2*i]), shell=True).split(' ')[0])/4 
                 self.tot_pe[self.prefix_pe['sample-'+str(i)]]=count
-                print  ('\t').join([self.prefix_pe['sample-'+str(i)],'raw data','FastQC-check','raw reads',str(count),'100.00 %'])
+                #print  ('\t').join([self.prefix_pe['sample-'+str(i)],'raw data','FastQC-check','raw reads',str(count),'100.00 %'])
+                self.op_progress(self.prefix_pe['sample-'+str(i)], 'raw data', 'FastQC-check', 'raw reads', str(count), '100.00 %')
                 
-
-        # log
+                # log
         self.logger, self.logging_mutex = cmdline.setup_logging (__name__, args.log_file, args.verbose)
         
         
@@ -156,7 +160,12 @@ class Pipeline:
                     M[x][y] = 0
         return S1[x_longest-longest: x_longest]
         
-
+    def op_progress(self, name_sample, p2, p3, p4, p5, p6):
+        ''' prints out the provided parameters as a line formated in standard column widths.
+            This function probably belongs in module Monitoring, but is put here until that is sorted out.
+            '''
+        print "{0:20} {1:16} {2:16} {3:20} {4:>12}  {5:>8}".format(name_sample, p2, p3, p4, p5, p6)
+        
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # PIPELINE STAGES FUNCTION
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #            
@@ -258,11 +267,11 @@ class Pipeline:
                 
                 #  ~~~~ monitoring: count of reads  ~~~~ #  
                 name_sample = self.prefix_pe[os.path.basename(input_files[0]).split('_R1.fq.gz')[0]]            
-                stat= Monitoring(self.tot_pe[name_sample])
+                stat = Monitoring(self.tot_pe[name_sample])
                 ## processed reads
                 processed_reads = stat.count_processed_reads(log)
-                print ('\t').join([name_sample,'trimming','Trimmomatic','raw reads',str(processed_reads),stat.get_tot_percentage(processed_reads)])
-
+                #print ('\t').join([name_sample,'trimming','Trimmomatic','raw reads',str(processed_reads),stat.get_tot_percentage(processed_reads)])
+                self.op_progress(name_sample,'trimming','Trimmomatic','raw reads',str(processed_reads),stat.get_tot_percentage(processed_reads))
                   
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # PIPELINE: STEP N_3
@@ -325,7 +334,8 @@ class Pipeline:
                 processed_reads = stat.count_processed_reads(trimm_file)
                 phiX_reads = int(subprocess.check_output("wc -l "+output_file, shell=True).split(' ')[0])
                 non_phiX_reads = processed_reads - phiX_reads
-                print ('\t').join([name_sample,'PhiX removal','bamM make','processed reads',str(non_phiX_reads),stat.get_tot_percentage(non_phiX_reads)])
+                #print ('\t').join([name_sample,'PhiX removal','bamM make','processed reads',str(non_phiX_reads),stat.get_tot_percentage(non_phiX_reads)])
+                self.op_progress(name_sample,'PhiX removal','bamM make','processed reads',str(non_phiX_reads),stat.get_tot_percentage(non_phiX_reads))
 
         @subdivide(trimmomatic,regex(r"trimm_[UP][12].fq.gz"),["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"])
         def QC_output(input_files,output_files):
@@ -420,8 +430,9 @@ class Pipeline:
             stat= Monitoring(self.tot_pe[name_sample])
             ## non ncRNA reads
             non_ncRNA_reads = stat.count_seq_fq(output_files[0])+stat.count_seq_fq(output_files[2])
-            print ('\t').join([name_sample,'remove ncRNA','SortMeRNA','filtered reads (1st)',
-                               str(non_ncRNA_reads),stat.get_tot_percentage(non_ncRNA_reads)])
+            #print ('\t').join([name_sample,'remove ncRNA','SortMeRNA','filtered reads (1st)',
+            #                   str(non_ncRNA_reads),stat.get_tot_percentage(non_ncRNA_reads)])
+            self.op_progress(name_sample, 'remove ncRNA', 'SortMeRNA', 'filtered reads (1st)', str(non_ncRNA_reads), stat.get_tot_percentage(non_ncRNA_reads))
 
         # Map separately paired-end and singletons with 'BamM' and merge the results in one .bam file
         # WARNINGS
@@ -472,9 +483,10 @@ class Pipeline:
             stat= Monitoring(self.tot_pe[name_sample])
             ## reads filtered : mapped with high stringency
             mapped_reads = stat.count_mapping_reads(flagstat,True)
-            print ('\t').join([name_sample,'alignment','BamM make','filtered reads (2nd)',
-                               str(mapped_reads),stat.get_tot_percentage(mapped_reads)])
-        
+            #print ('\t').join([name_sample,'alignment','BamM make','filtered reads (2nd)',
+            #                   str(mapped_reads),stat.get_tot_percentage(mapped_reads)])
+            self.op_progress(name_sample, 'alignment', 'BamM make', 'filtered reads (2nd)', str(mapped_reads), stat.get_tot_percentage(mapped_reads))
+            
         @transform(map2ref,formatter('.bam'),"{path[0]}/{basename[0]}_filtered.bam", 
                    "{path[0]}/{basename[0]}_stringency_filter.log",self.logger, self.logging_mutex)
         def mapping_filter (input_file, output_file,flagstat,logger,logging_mutex):
@@ -504,13 +516,11 @@ class Pipeline:
                 stat= Monitoring(self.tot_pe[name_sample])
                 ## reads filtered : mapped with high stringency
                 mapped_reads_f = stat.count_mapping_reads(flagstat,False)
-                print ('\t').join([name_sample,'.bam filter','BamM filter','mapped reads',
-                                   str(mapped_reads_f),stat.get_tot_percentage(mapped_reads_f)])
+                #print ('\t').join([name_sample,'.bam filter','BamM filter','mapped reads',
+                #                   str(mapped_reads_f),stat.get_tot_percentage(mapped_reads_f)])
+                self.op_progress(name_sample, '.bam filter', 'BamM filter', 'mapped reads', str(mapped_reads_f), stat.get_tot_percentage(mapped_reads_f))
 
-    
-        
-        
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+                # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # PIPELINE: STEP N_6 (normalized_cov)
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ # 
     # coverage if bins provided

@@ -4,10 +4,14 @@
 	See http://http://transcriptm.tiddlyspot.com/
     """
 
-    #print "3: Created funct further_process_args to run valid_SortMeRNA. Encapsulated funct CustomHelpFormatter into parser_built_with_ruffus."
-#print "4. (a) Created funct valid_adapters_fileloc in further_process_args. (b) Indented nicely the description parameter when calling cmdline.get_argparse."
-#print "5. Tidied up some formatting of strings, etc. in parser_built_with_ruffus"
-print "*** 7. In transcriptm, implemented funct valid_paired_end to check that all the paired end files exist."
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Developer's temporary playground
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# 3: Created funct further_process_args to run valid_SortMeRNA. Encapsulated funct CustomHelpFormatter into parser_built_with_ruffus."
+# 4. (a) Created funct valid_adapters_fileloc in further_process_args. (b) Indented nicely the description parameter when calling cmdline.get_argparse."
+# 5. Tidied up some formatting of strings, etc. in parser_built_with_ruffus"
+# 7. In transcriptm, implemented funct valid_paired_end to check that all the paired end files exist."
+#print "*** 8. " 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -96,6 +100,9 @@ def parser_built_with_ruffus(objTempDir):
         )
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # General options
+    ###?
+    ###? Can all of the `dest="..."` parameters be removed (since they don't vary from the --argument name)?
+    ###?
     parser._optionals.title = "General options" # Overwrite the hard-coded title 'optional arguments' for this group of arguments, 
                                                 #  because presumably, most of these arguments are not optional.
                                                 # (nb. This call seems to delve behind the class's public interface, so this code has 
@@ -229,7 +236,7 @@ def further_process_args(args):
             ### END_DEADCODE
             raise Exception ("No index found for SortMeRNA database.\n Use the cmdline below: \n" + \
                              "sortmerna/2.0/bin/indexdb_rna --ref path_db1,path_index1:path_db2,path_index2 ")
-            exit(1) #RKR: Is this line needed after raising an exception?
+            exit(1) #? RKR: Is this line needed after raising an exception?
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~           
     ''' Go ahead and perform the processsing. 
         '''
@@ -237,7 +244,6 @@ def further_process_args(args):
     valid_adapters_fileloc()
     valid_SortMeRNA()
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def main_prog():
     """ runs the main program for TranscriptM.

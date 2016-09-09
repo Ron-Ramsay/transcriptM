@@ -1,15 +1,24 @@
 #!/usr/bin/env python
 
-import subprocess
-import re
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Developer's temporary playground
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+print "*** 8. Added import descriptions. Format percentage with 2dp."
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Python Standard Library modules
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+import subprocess    # spawn new processes, connect to their input/output/error pipes, and obtain their return codes. (Python Standard Library module).
+import re            # regular expression operations. (Python Standard Library module).
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 # CLASS: MONITORING
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 class Monitoring:
-    def __init__(self,tot_raw):
+    
+    def __init__(self, tot_raw):
         self.reads = [0] * 6
-        self.reads[0]= tot_raw
+        self.reads[0] = tot_raw
         #{"raw","trimmed","phix","ncRNA","mapped","mapped_strict"}
     
     def count_seq_fq(self,fastq_file):
@@ -58,7 +67,8 @@ class Monitoring:
 
     def get_tot_percentage(self,count_reads):
         tot_percentage = round(float(count_reads)/self.reads[0]*100,2) 
-        return (str(tot_percentage)+' %')    
+        #return (str(tot_percentage)+' %')    
+        return "{0:.2f} %".format(tot_percentage)
 
     def get_percentage_prev(self, index):
         if index >0:        
@@ -77,5 +87,3 @@ class Monitoring:
         for i in range(1,6):
             prev_percentage[i] = round(float(self.reads[i]) /self.reads[i-1]*100,2)
         return prev_percentage
-
-    

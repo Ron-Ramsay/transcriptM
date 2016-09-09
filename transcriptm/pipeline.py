@@ -7,7 +7,7 @@
 # 7: Changed version.py to 0.3.3"
 # 7: Removed pipeline.py code that I had previously relocated to transcriptm as funct valid_adapters_fileloc which created argument adaptersFile, as used in pipeline.py function trimmomatic."
 # 8: Use new op_progress function."
-print "*** 9: Commenting and evaluating paired_ends-related code in Pipeline.__init__."
+print "*** 10: Restructure Pipeline.__init__."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -41,33 +41,30 @@ from monitoring import Monitoring  # implements class `Monitoring`. (Locally-wri
 # Class: Pipeline
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 class Pipeline:
-    
+    """
+        """
     def __init__(self, args):
-        
-        self.args = args
-        
-        # PhiX: reference genome 
-        self.ref_genome_phiX= os.path.join(self.args.db_path,'2-PhiX/phiX.fa')
-        if not os.path.isfile(self.ref_genome_phiX):
-            raise Exception ("The subdirectory 2-PhiX/ or the file %s does not exist in %s (db_path provided)"
-                            %(os.path.basename(self.ref_genome_phiX),self.args.db_path))
-            exit(1)
-        
-        # gff files
-        self.list_gff = list(numpy.sort(self.get_files(self.args.dir_bins ,'.gff')))
-        if len(set([os.path.basename(x) for x in self.list_gff]))<len(self.list_gff):
-            raise Exception ("--dir_bins args \nWarning: some gff files have the same name")
-            exit(1)
-
-        # prefix
-        #self.alias_pe = {} Moved this line down a few.
-        
-        #if self.args.paired_end: #! DEAD CODE(?): Program argument `paired_end` is manditory, so not sure why this `if` test is required.
-        if True:
-
-            ###! ADD VALIDATION(?): Check an even number of list entries (since in paired-end files come in pairs).
-        
-            ###! FUNCTIONALIZE(?): ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+        """
+            """
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        def determine_ref_genome_phiX():
+            """ Instantiates `self.ref_genome_phiX` (PhiX: reference genome).
+                """
+            self.ref_genome_phiX = os.path.join(self.args.db_path, '2-PhiX/phiX.fa')
+            if not os.path.isfile(self.ref_genome_phiX):
+                raise Exception("The subdirectory 2-PhiX/ or the file %s does not exist in %s (db_path provided)"
+                                %(os.path.basename(self.ref_genome_phiX), self.args.db_path))
+                exit(1)
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        def determine_list_gff():
+            """ Instantiates `self.list_gff` (gff files).
+                """
+            self.list_gff = list(numpy.sort(self.get_files(self.args.dir_bins , '.gff')))
+            if len(set([os.path.basename(x) for x in self.list_gff])) < len(self.list_gff):
+                raise Exception ("--dir_bins args \nWarning: some gff files have the same name")
+                exit(1)
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        def determine_alias_pe():
             """ Populates dictionary `self.alias_pe`: 
                 index: original filenames (of metatranscriptomic reads), as listed in argument `paired_end`.
                 value: matching working directory filenames (but these filenames will not yet be created).
@@ -77,14 +74,15 @@ class Pipeline:
                 """
             self.alias_pe = {}  
             for i in range(int(len(self.args.paired_end)/2)): # Loop an index through the pairs in the `paired_end` list.
-                self.alias_pe[os.path.join(self.args.working_dir,'sample-'+str(i)+'_R1.fq.gz')] =self.args.paired_end[2*i]
-                self.alias_pe[os.path.join(self.args.working_dir,'sample-'+str(i)+'_R2.fq.gz')] =self.args.paired_end[2*i+1]
-            
-            ###! FUNCTIONALIZE(?): ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-            """ Populates dictionary `self.prefix_pe`:
+                self.alias_pe[os.path.join(self.args.working_dir, 'sample-'+str(i)+'_R1.fq.gz')] = self.args.paired_end[2*i]
+                self.alias_pe[os.path.join(self.args.working_dir, 'sample-'+str(i)+'_R2.fq.gz')] = self.args.paired_end[2*i+1]
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        def determine_prefix_pe():
+            """ populates dictionary `self.prefix_pe`:
                 index: "sample-n", where 'n' is the zero-based counter for each *pair* of filenames passed in `paired_end`. 
                 value: descriptor of the longest common substring (trimmed of some types of trailing characters) for the pair of filenames.
                 e.g. {'sample-0': '20120800_P2M', ...}
+                Dependencies: self.args.paired_end.
                 """
             self.prefix_pe = {}
             for  i in range(int(len(self.args.paired_end)/2)): # Loop an index through the pairs in the `paired_end` list.
@@ -93,48 +91,54 @@ class Pipeline:
                 value = self.longest_common_substring(os.path.basename(self.args.paired_end[2*i]),
                                                       os.path.basename(self.args.paired_end[2*i+1]))
                 # Trim the `value` to be rid of various trailing characters:
-                if value.endswith(('.','_','-'),0): ###! ARGUMENT NOT REQUIRED(?): i.e. the `0`.
+                if value.endswith(('.','_','-'), 0): ###! ARGUMENT NOT REQUIRED(?): i.e. the `0`.
                     value=value[:-1]  
-                elif value.endswith(('_R','-R','.R'),0): ###! ARGUMENT NOT REQUIRED(?): i.e. the `0`.
+                elif value.endswith(('_R','-R','.R'), 0): ###! ARGUMENT NOT REQUIRED(?): i.e. the `0`.
                     value=value[:-2]                               
-                self.prefix_pe['sample-'+str(i)]=value
+                self.prefix_pe['sample-'+str(i)] = value
             # Verify that no pairs were parsed down to the same descriptor:
             ###! IMPROVEMENT POSSIBLE: Below, when raising an error, show the user which filenames clashed. 
-            if len(set(self.prefix_pe.values()))< int(len(self.args.paired_end)/2):
+            if len(set(self.prefix_pe.values())) < int(len(self.args.paired_end)/2):
                 print [item for item, count in collections.Counter(self.prefix_pe.values()).items() if count > 1]
                 raise Exception ("2 sets of paired-ends files have the same prefix. Rename one set. \n")
                 exit(1)
-             
-            ###! FUNCTIONALIZE(?): ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-            """ Populates dictionary `self.tot_pe`:
-                    index: descriptor of the longest common substring (trimmed of some types of trailing characters) 
-                        for the pair of filenames;
-                        i.e. corresponds to the values of  dictionary `self.prefix_pe`.
-                    value: the count of reads.
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        def determine_tot_pe():
+            """ populates dictionary `self.tot_pe`:
+                index: descriptor of the longest common substring (trimmed of some types of trailing characters) 
+                    for the pair of filenames;
+                    i.e. corresponds to the values of  dictionary `self.prefix_pe`.
+                value: the count of reads.
                 e.g. {'20120800_P2M': 815272, ...}
+                Dependencies: self.args.paired_end, self.prefix_pe.
                 """
             self.tot_pe = {}
             for i in range(int(len(self.args.paired_end)/2)):
-                ###! VARIABLE HAS UNWANTED SCOPE: `count`; (but is only used here).
                 ###! ACCURACY?: Is dividing the number of lines in the file by for completely accurate? e.g. Could the file have comment lines? 
                 count = int(subprocess.check_output("zcat %s | wc -l " %(self.args.paired_end[2*i]), shell=True).split(' ')[0])/4 
                 self.tot_pe[self.prefix_pe['sample-'+str(i)]]=count
-                #print  ('\t').join([self.prefix_pe['sample-'+str(i)],'raw data','FastQC-check','raw reads',str(count),'100.00 %'])
                 self.op_progress(self.prefix_pe['sample-'+str(i)], 'raw data', 'FastQC-check', 'raw reads', str(count), '100.00 %')
-                
-        # Set up logging:
-        self.logger, self.logging_mutex = cmdline.setup_logging (__name__, args.log_file, args.verbose)
-        ''' sets up Ruffus' standard python logger, which can be synchronised across concurrent Ruffus tasks.
-            Variables `logger` and `logging_mutex` are meant to be passed as parameters to each Ruffus job.  
-                `logger`: forwards logging calls across jobs.
-                `logging_mutex`: prevents different jobs which are logging simultaneously from being jumbled up.
-            '''       
-        
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        def setup_logging():
+            """ sets up Ruffus' standard python logger, which can be synchronised across concurrent Ruffus tasks.
+                Variables `self.logger` and `self.logging_mutex` are meant to be passed as parameters to each Ruffus job.  
+                    `logger`: forwards logging calls across jobs.
+                    `logging_mutex`: prevents different jobs which are logging simultaneously from being jumbled up.
+                """       
+            self.logger, self.logging_mutex = cmdline.setup_logging(__name__, args.log_file, args.verbose)
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        self.args = args  # store arguments passed.
+        determine_ref_genome_phiX()
+        determine_list_gff()
+        ###! ADD VALIDATION(?): Check an even number of list entries (since in paired-end files come in pairs).
+        determine_alias_pe()
+        determine_prefix_pe()
+        determine_tot_pe()
+        setup_logging()
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # MISCELLANEOUS FUNCTIONS
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # 
-    
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def re_symlink (self,input_file, soft_link_name, logger, logging_mutex):
         """
         Helper function: relinks soft symbolic link if necessary
@@ -309,7 +313,6 @@ class Pipeline:
                 stat = Monitoring(self.tot_pe[name_sample])
                 ## processed reads
                 processed_reads = stat.count_processed_reads(log)
-                #print ('\t').join([name_sample,'trimming','Trimmomatic','raw reads',str(processed_reads),stat.get_tot_percentage(processed_reads)])
                 self.op_progress(name_sample,'trimming','Trimmomatic','raw reads',str(processed_reads),stat.get_tot_percentage(processed_reads))
                   
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -373,7 +376,6 @@ class Pipeline:
                 processed_reads = stat.count_processed_reads(trimm_file)
                 phiX_reads = int(subprocess.check_output("wc -l "+output_file, shell=True).split(' ')[0])
                 non_phiX_reads = processed_reads - phiX_reads
-                #print ('\t').join([name_sample,'PhiX removal','bamM make','processed reads',str(non_phiX_reads),stat.get_tot_percentage(non_phiX_reads)])
                 self.op_progress(name_sample,'PhiX removal','bamM make','processed reads',str(non_phiX_reads),stat.get_tot_percentage(non_phiX_reads))
 
         @subdivide(trimmomatic,regex(r"trimm_[UP][12].fq.gz"),["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"])
@@ -469,8 +471,6 @@ class Pipeline:
             stat= Monitoring(self.tot_pe[name_sample])
             ## non ncRNA reads
             non_ncRNA_reads = stat.count_seq_fq(output_files[0])+stat.count_seq_fq(output_files[2])
-            #print ('\t').join([name_sample,'remove ncRNA','SortMeRNA','filtered reads (1st)',
-            #                   str(non_ncRNA_reads),stat.get_tot_percentage(non_ncRNA_reads)])
             self.op_progress(name_sample, 'remove ncRNA', 'SortMeRNA', 'filtered reads (1st)', str(non_ncRNA_reads), stat.get_tot_percentage(non_ncRNA_reads))
 
         # Map separately paired-end and singletons with 'BamM' and merge the results in one .bam file
@@ -522,8 +522,6 @@ class Pipeline:
             stat= Monitoring(self.tot_pe[name_sample])
             ## reads filtered : mapped with high stringency
             mapped_reads = stat.count_mapping_reads(flagstat,True)
-            #print ('\t').join([name_sample,'alignment','BamM make','filtered reads (2nd)',
-            #                   str(mapped_reads),stat.get_tot_percentage(mapped_reads)])
             self.op_progress(name_sample, 'alignment', 'BamM make', 'filtered reads (2nd)', str(mapped_reads), stat.get_tot_percentage(mapped_reads))
             
         @transform(map2ref,formatter('.bam'),"{path[0]}/{basename[0]}_filtered.bam", 
@@ -555,8 +553,6 @@ class Pipeline:
                 stat= Monitoring(self.tot_pe[name_sample])
                 ## reads filtered : mapped with high stringency
                 mapped_reads_f = stat.count_mapping_reads(flagstat,False)
-                #print ('\t').join([name_sample,'.bam filter','BamM filter','mapped reads',
-                #                   str(mapped_reads_f),stat.get_tot_percentage(mapped_reads_f)])
                 self.op_progress(name_sample, '.bam filter', 'BamM filter', 'mapped reads', str(mapped_reads_f), stat.get_tot_percentage(mapped_reads_f))
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #

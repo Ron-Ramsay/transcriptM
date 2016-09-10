@@ -8,7 +8,7 @@
 # 7: Removed pipeline.py code that I had previously relocated to transcriptm as funct valid_adapters_fileloc which created argument adaptersFile, as used in pipeline.py function trimmomatic."
 # 8: Use new op_progress function."
 # 10: Restructure Pipeline.__init__."
-print "*** 11: (a) Renamed class Pipeline to full_tm_pipeline. (b) encapsulated function rename_files as rename_files_in_dir in function clear."
+print "*** 11.1: rename_files_in_dir in function clear."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -961,16 +961,19 @@ class full_tm_pipeline:
 
         # rename logfile
         log_dir = os.path.join(self.args.output_dir,"log/")
-        self.rename_files_in_dir(log_dir)          
+        rename_files_in_dir(log_dir)          
+        
         # rename fastqc report
         fastqc_raw = os.path.join(self.args.output_dir,"FastQC_raw/")
-        self.rename_files_in_dir(fastqc_raw) 
+        rename_files_in_dir(fastqc_raw) 
+        
         # rename fastqc report
         fastqc_processed = os.path.join(self.args.output_dir,"FastQC_processed/")
-        self.rename_files_in_dir(fastqc_processed)
+        rename_files_in_dir(fastqc_processed)
+        
         # rename processed reads
         processed_dir =os.path.join(self.args.output_dir,"processed_reads/")
-        self.rename_files_in_dir(processed_dir)
+        rename_files_in_dir(processed_dir)
         
         ##? Replace above lines with this:
         ## Rename logfile, fastqc report, fastqc report, processed reads:

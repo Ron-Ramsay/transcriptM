@@ -1,31 +1,32 @@
 #!/usr/bin/env python
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Developer's temporary playground
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # 6: Documented imports; removed ipython import; made ruffus imports specific."
 # 7: Changed version.py to 0.3.3"
 # 7: Removed pipeline.py code that I had previously relocated to transcriptm as funct valid_adapters_fileloc which created argument adaptersFile, as used in pipeline.py function trimmomatic."
 # 8: Use new op_progress function."
 # 10: Restructure Pipeline.__init__."
 # 12: rewrite function clear."
-print "13: "
+# 14: rewrite function clear."
+ print # 14: rewrite function clear."
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 import os            # miscellaneous operating system interfaces. (Python Standard Library module).
-import subprocess    # spawn new processes, connect to their input/output/error pipes, and obtain their return codes. (Python Standard Library module).
-import tempfile      # generates temporary files and directories. works on all supported platforms. (Python Standard Library module).
+import subprocess    # spawn new processes, connect to their input/output/error pipes. (Python Standard Library module).
+import tempfile      # generates temporary files/dirs; works on all supported platforms. (Python Standard Library module).
 import csv           # Comma Separated Values file reading and writing. (Python Standard Library module).
 import re            # regular expression operations. (Python Standard Library module).
 import string        # common string operations. (Python Standard Library module).
 import collections   # high-performance container datatypes. (Python Standard Library module).
 import shutil        # high-level file operations. (Python Standard Library module).
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # External, non-standard modules
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 import extern        # opinionated version of Python's `subprocess`. (See https://pypi.python.org/pypi/extern/0.1.0)
 import numpy         # array processing for numbers, strings, records, and objects. (Non-standard module. See http://www.numpy.org/).
 # ruffus:            # light-weight computational pipeline management. (Non-standard module. See http://www.ruffus.org.uk).
@@ -34,21 +35,22 @@ from ruffus import suffix, regex, formatter, add_inputs                      # r
 from ruffus import active_if, mkdir                                          # ruffus other.
 import ruffus.cmdline as cmdline
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Locally written modules
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 from monitoring import Monitoring  # implements class `Monitoring`. (Locally-written module).
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Class
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 class full_tm_pipeline:
     """ a ruffus pipeline implementing all the stages of TranscriptM.
         """
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def __init__(self, args):
         """ routines automatically executed upon instantiation of an instance of this class. 
             """
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def determine_ref_genome_phiX():
             """ instantiates and validates `self.ref_genome_phiX`: the filepath of the reference genome file (PhiX).
                 """
@@ -57,7 +59,7 @@ class full_tm_pipeline:
                 raise Exception("The subdirectory 2-PhiX/ or the file %s does not exist in %s (db_path provided)"
                                 %(os.path.basename(self.ref_genome_phiX), self.args.db_path))
                 exit(1)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def determine_list_gff():
             """ instantiates and validates `self.list_gff`: the list of gff files.
                 """
@@ -65,7 +67,7 @@ class full_tm_pipeline:
             if len(set([os.path.basename(x) for x in self.list_gff])) < len(self.list_gff):
                 raise Exception ("--dir_bins args \nWarning: some gff files have the same name")
                 exit(1)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def determine_alias_pe():
             """ populates dictionary `self.alias_pe`: 
                 index: original filenames (of metatranscriptomic reads), as listed in argument `paired_end`.
@@ -78,7 +80,7 @@ class full_tm_pipeline:
             for i in range(int(len(self.args.paired_end)/2)): # Loop an index through the pairs in the `paired_end` list.
                 self.alias_pe[os.path.join(self.args.working_dir, 'sample-'+str(i)+'_R1.fq.gz')] = self.args.paired_end[2*i]
                 self.alias_pe[os.path.join(self.args.working_dir, 'sample-'+str(i)+'_R2.fq.gz')] = self.args.paired_end[2*i+1]
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def determine_prefix_pe():
             """ populates dictionary `self.prefix_pe`:
                 index: "sample-n", where 'n' is the zero-based counter for each *pair* of filenames passed in `paired_end`. 
@@ -104,7 +106,7 @@ class full_tm_pipeline:
                 print [item for item, count in collections.Counter(self.prefix_pe.values()).items() if count > 1]
                 raise Exception ("2 sets of paired-ends files have the same prefix. Rename one set. \n")
                 exit(1)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def determine_tot_pe():
             """ populates dictionary `self.tot_pe`:
                 index: descriptor of the longest common substring (trimmed of some types of trailing characters) 
@@ -120,7 +122,7 @@ class full_tm_pipeline:
                 count = int(subprocess.check_output("zcat %s | wc -l " %(self.args.paired_end[2*i]), shell=True).split(' ')[0])/4 
                 self.tot_pe[self.prefix_pe['sample-'+str(i)]]=count
                 self.op_progress(self.prefix_pe['sample-'+str(i)], 'raw data', 'FastQC-check', 'raw reads', str(count), '100.00 %')
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def setup_logging():
             """ sets up Ruffus' standard python logger, which can be synchronised across concurrent Ruffus tasks.
                 Variables `self.logger` and `self.logging_mutex` are meant to be passed as parameters to each Ruffus job.  
@@ -128,7 +130,7 @@ class full_tm_pipeline:
                     `logging_mutex`: prevents different jobs which are logging simultaneously from being jumbled up.
                 """       
             self.logger, self.logging_mutex = cmdline.setup_logging(__name__, args.log_file, args.verbose)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         self.args = args             # Store arguments passed.
         determine_ref_genome_phiX()  # Generate and validate derived argments...
         determine_list_gff()         #
@@ -136,11 +138,11 @@ class full_tm_pipeline:
         determine_prefix_pe()        #
         determine_tot_pe()           #
         setup_logging()              # Set up logging.
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Helper functions
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def re_symlink (self, input_file, soft_link_name, logger, logging_mutex):
         """ (helper): relinks soft symbolic link if necessary.
             (This function from the ruffus website: http://www.ruffus.org.uk/faq.html?highlight=re_symlink) 
@@ -166,7 +168,7 @@ class full_tm_pipeline:
         os.symlink(
             os.path.relpath(os.path.abspath(input_file), os.path.abspath(os.path.dirname(soft_link_name))), 
             soft_link_name)
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def get_files(self, directory, extension):
         """ (helper): returns a list of files with a specific extension in a directory and its subdirectories.
             """
@@ -176,7 +178,7 @@ class full_tm_pipeline:
                 if f.endswith(extension):
                     list_files.append(os.path.join(root, f))
         return list_files
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def has_index(self, f, list_extension):
         """ (helper): check if a file f has index 
             (if its directory also contains files ending with extensions given in a list).
@@ -187,7 +189,7 @@ class full_tm_pipeline:
                 index=False
                 break
         return index
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def longest_common_substring(self, S1, S2):
         """ (helper): returns the longest common substring between 2 strings.
             """
@@ -203,16 +205,16 @@ class full_tm_pipeline:
                 else:
                     M[x][y] = 0
         return S1[x_longest-longest: x_longest]
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def op_progress(self, name_sample, p2, p3, p4, p5, p6):
         ''' prints out the provided parameters as a line formated in standard column widths.
             This function probably belongs in module Monitoring, but is put here until that is sorted out.
             '''
         print "{0:20} {1:16} {2:16} {3:20} {4:>12}  {5:>8}".format(name_sample, p2, p3, p4, p5, p6)
 
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Pipeline Stages
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def pipeline_stages(self):
         """ defines all the pipelined functions and runs them.
             """
@@ -223,9 +225,9 @@ class full_tm_pipeline:
         def testfunction ():
             pass
             
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_1
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Create symbolic link of inputs files in the working directory
         
         @mkdir(self.args.working_dir)
@@ -270,9 +272,9 @@ class full_tm_pipeline:
                     logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
                 self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
             
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_2
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # First step in the QC process of the raw reads: trimming based on length and quality score     
 
         @collate(symlink_to_wd_metaT,
@@ -318,9 +320,9 @@ class full_tm_pipeline:
                 processed_reads = stat.count_processed_reads(log)
                 self.op_progress(name_sample,'trimming','Trimmomatic','raw reads',str(processed_reads),stat.get_tot_percentage(processed_reads))
                   
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_3
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Second step in the QC process: remove phiX contamination
         @subdivide(trimmomatic,formatter(r"(.+)/(?P<BASE>.*)P1.fq.gz"),["{path[0]}/phiX.{BASE[0]}P1.bam",
                                                                         "{path[0]}/phiX.{BASE[0]}U1.bam",
@@ -403,9 +405,9 @@ class full_tm_pipeline:
                         logger.debug("phiX_extract: cmdline\n"+ cmd)
                     extern.run(cmd) 
 
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_4
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Third step in the QC process: remove rRNA, tRNA ...
         
         @subdivide(phiX_extract,formatter(), "{path[0]}/{basename[0]}_non_ncRNA.fq",
@@ -425,9 +427,9 @@ class full_tm_pipeline:
                     logger.debug("sortmerna: cmdline\n"+ cmd)
                 extern.run(cmd)
     
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_5
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # mapping the reads to reference genome       
         
         #-move the singleton (generated with sortmerna) with the single ones
@@ -556,9 +558,9 @@ class full_tm_pipeline:
                 mapped_reads_f = stat.count_mapping_reads(flagstat,False)
                 self.op_progress(name_sample, '.bam filter', 'BamM filter', 'mapped reads', str(mapped_reads_f), stat.get_tot_percentage(mapped_reads_f))
 
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_6 (normalized_cov)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # coverage if bins provided
         if self.args.no_mapping_filter :  
             bam_file = map2ref 
@@ -599,9 +601,9 @@ class full_tm_pipeline:
                     logger.debug("bam2normalized_cov: cmdline\n"+ cmd1)
                 extern.run(cmd1)                
         
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_6 BIS (raw count)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # raw count if bins provided
         
         if self.args.no_mapping_filter :  
@@ -625,9 +627,9 @@ class full_tm_pipeline:
                     logger.debug("bam2raw_count: cmdline\n"+ cmd)                                       
                 extern.run(cmd)        
 
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_7 (normalized_cov table)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
         # Concatenate all the normalized_cov results in a table
         @mkdir(self.args.output_dir)
@@ -686,9 +688,9 @@ class full_tm_pipeline:
             with logging_mutex:     
                 logger.info("Create table that contains normalized_cov values for each gene of each bin given as input for the different samples: %s"%(','.join(self.prefix_pe.values())))    
             
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_7 BIS (raw count table)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
         # Concatenate all the raw count in a table
         @mkdir(self.args.output_dir)
@@ -746,9 +748,9 @@ class full_tm_pipeline:
             with logging_mutex:     
                 logger.info("Create table that contains raw count values for each gene of each bin given as input for the different samples: %s"%(','.join(self.prefix_pe.values())))    
     
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: TRACE FILE N_1
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Create the first output: a fastqc report of raw DATA
         
         subdir_1= os.path.join(self.args.output_dir,"FastQC_raw")
@@ -777,9 +779,9 @@ class full_tm_pipeline:
                 logger.debug("view_raw_data: cmdline\n"+cmd)
             extern.run(cmd)
     
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: TRACE FILE N_2
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
         # Create the second output: a fastqc report of processed DATA
         subdir_2 = os.path.join(self.args.output_dir,"FastQC_processed")
@@ -809,9 +811,9 @@ class full_tm_pipeline:
                 logger.debug("view_processed_data: cmdline\n"+cmd)
             extern.run(cmd)
 
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE:TRACE FILE N_3
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # get monitoring data
         
         subdir_3= os.path.join(self.args.output_dir,"log/")
@@ -902,9 +904,9 @@ class full_tm_pipeline:
                 logger.debug("concatenate_logtables: cmdline\n"+cmd)                
             extern.run(cmd)  
             
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE:TRACE FILE N_4
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # save the processed metaT reads
         
         subdir_4 = os.path.join(self.args.output_dir,"processed_reads/")
@@ -933,33 +935,44 @@ class full_tm_pipeline:
                     logger.debug("save_processed_reads: cmdline\n"+cmd)
                 extern.run(cmd)
     
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: RUN
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         cmdline.run(self.args)
     
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # CLEAR FUNCTION: rename files ...
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # CLEAR FUNCTION:
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def clear(self):
-        """ ??? Does some kinds of clean up?: Renames files. Removes directories.
+        """ tidy-up of the program's output directory, (renames certain files, and deletes a subdirectory),
+            intended to be performed after the pipeline stages have been run.
             """
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        def rename_files_with_pe_prefix_in_dir(directory):
-            """ renames all files in `directory` with their 'real name'. (???)
-                It seems that first part of the filenames, i.e. up to the first "_",
-                are replaced by the first part (up to the first "_") of `self.prefix_pe`.
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        def rename_output_files_original_name():
+            """ renames all files in output directories with their 'real name'. (???)
                 """
-            for f in os.listdir(directory): # for all entries in the directory, as strings:
-                f_old = os.path.join(directory, f)          
-                f_new = os.path.join(directory, string.replace(f, f.split('_')[0], self.prefix_pe[f.split('_')[0]]))
-                os.rename(f_old, f_new)                
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # Rename files in these directories:
-        for dirName in ["log/", "FastQC_raw/", "FastQC_processed/", "processed_reads/"]:
-            rename_files_with_pe_prefix_in_dir(os.path.join(self.args.output_dir, dirName))        
-        # clean dir:
-        try:
-            shutil.rmtree(os.path.join(self.args.output_dir,"reads_distribution/"))
-        except OSError:
-            pass   
+            # Files under these particular subdirectories of the program's output directory are the ones to be renamed:
+            for subDir in ["log/", "FastQC_raw/", "FastQC_processed/", "processed_reads/"]:
+                # Get the current subdirectory's full pathname:
+                fullDir = os.path.join(self.args.output_dir, subDir)
+                # Iterate through each file in that subdirectory, to rename the file.
+                for f in os.listdir(fullDir):
+                    f_oldname = os.path.join(fullDir, f)          
+                    f_newname = os.path.join(fullDir, 
+                        # Replace the first part of the filenames, i.e. up to the first "_",
+                        # by the first part of `self.prefix_pe`, i.e. up to the first "_". 
+                        string.replace(f, f.split('_')[0], self.prefix_pe[f.split('_')[0]])
+                        )
+                    os.rename(f_oldname, f_newname)
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        def remove_reads_distribution_dir():
+            ''' removes the "reads_distribution" subdirectory of the program's output directory.
+                '''
+            try:
+                shutil.rmtree(os.path.join(self.args.output_dir, "reads_distribution/"))
+            except OSError:
+                pass
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rename_output_files_original_name()
+        remove_reads_distribution_dir()
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

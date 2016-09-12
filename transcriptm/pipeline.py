@@ -8,7 +8,8 @@
 # 7: Removed pipeline.py code that I had previously relocated to transcriptm as funct valid_adapters_fileloc which created argument adaptersFile, as used in pipeline.py function trimmomatic."
 # 8: Use new op_progress function."
 # 10: Restructure Pipeline.__init__."
-print "*** 12: rewrite function clear."
+# 12: rewrite function clear."
+print "13: "
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -950,35 +951,15 @@ class full_tm_pipeline:
                 are replaced by the first part (up to the first "_") of `self.prefix_pe`.
                 """
             for f in os.listdir(directory): # for all entries in the directory, as strings:
-                # f_new=os.path.join(directory,string.replace(f,f.split('_')[0],self.prefix_pe[f.split('_')[0]]) )   
-                # f= os.path.join(directory ,f)          
-                # os.rename(f, f_new)
-                ##Replace with this:
                 f_old = os.path.join(directory, f)          
                 f_new = os.path.join(directory, string.replace(f, f.split('_')[0], self.prefix_pe[f.split('_')[0]]))
                 os.rename(f_old, f_new)                
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-        # # rename logfile
-        # log_dir = os.path.join(self.args.output_dir,"log/")
-        # rename_files_in_dir(log_dir)          
-        # # rename fastqc report
-        # fastqc_raw = os.path.join(self.args.output_dir,"FastQC_raw/")
-        # rename_files_in_dir(fastqc_raw) 
-        # # rename fastqc report
-        # fastqc_processed = os.path.join(self.args.output_dir,"FastQC_processed/")
-        # rename_files_in_dir(fastqc_processed)
-        # # rename processed reads
-        # processed_dir =os.path.join(self.args.output_dir,"processed_reads/")
-        # rename_files_in_dir(processed_dir)
-        
-        # Rename files in these directories: logfile, fastqc report, fastqc report, processed reads:
+        # Rename files in these directories:
         for dirName in ["log/", "FastQC_raw/", "FastQC_processed/", "processed_reads/"]:
             rename_files_with_pe_prefix_in_dir(os.path.join(self.args.output_dir, dirName))        
-        
-        # clean dir
-        reads_distrib_dir = os.path.join(self.args.output_dir,"reads_distribution/")
+        # clean dir:
         try:
-            shutil.rmtree(reads_distrib_dir)
+            shutil.rmtree(os.path.join(self.args.output_dir,"reads_distribution/"))
         except OSError:
             pass   

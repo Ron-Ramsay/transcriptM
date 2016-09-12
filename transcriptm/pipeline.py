@@ -10,7 +10,7 @@
 # 10: Restructure Pipeline.__init__."
 # 12: rewrite function clear."
 # 14: rewrite function clear."
- print # 14: rewrite function clear."
+print "15: ruffus"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -27,14 +27,15 @@ import shutil        # high-level file operations. (Python Standard Library modu
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # External, non-standard modules
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-import extern        # opinionated version of Python's `subprocess`. (See https://pypi.python.org/pypi/extern/0.1.0)
-import numpy         # array processing for numbers, strings, records, and objects. (Non-standard module. See http://www.numpy.org/).
-# ruffus:            # light-weight computational pipeline management. (Non-standard module. See http://www.ruffus.org.uk).
+import extern        # opinionated version of Python's `subprocess`. See https://pypi.python.org/pypi/extern/0.1.0
+import numpy         # array processing for numbers, strings, records, and objects. Non-standard module. See http://www.numpy.org/
+# ruffus:            # light-weight computational pipeline management. (Non-standard module) See http://www.ruffus.org.uk
 from ruffus import collate, follows, merge, originate, subdivide, transform  # ruffus decorators.
 from ruffus import suffix, regex, formatter, add_inputs                      # ruffus filter / indicators.
 from ruffus import active_if, mkdir                                          # ruffus other.
 import ruffus.cmdline as cmdline
-
+#import ruffus.Pipeline as ruffus_Pipeline
+from ruffus import Pipeline as ruffus_Pipeline
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Locally written modules
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -219,12 +220,16 @@ class full_tm_pipeline:
         """ defines all the pipelined functions and runs them.
             """
         mode = 0
+        '''
         if self.args.sortmerna_precomputed: mode = 4
         
         @active_if(True)
         def testfunction ():
             pass
-            
+        '''    
+        # Decorated functions are automatically part of a default constructed Pipeline named "main".
+        main_pipeline = ruffus_Pipeline.pipelines["main"]
+
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_1
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -242,7 +247,7 @@ class full_tm_pipeline:
                     logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
                 self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
             
-        @mkdir(self.args.working_dir)        
+        @mkdir(self.args.working_dir)
         @transform(self.args.metaG_contigs, formatter(),
                         # move to working directory
                         os.path.join(self.args.working_dir,"{basename[0]}"+".fa"),
@@ -258,7 +263,7 @@ class full_tm_pipeline:
         
         # check if bwa index are present 
         @active_if(self.has_index(self.args.metaG_contigs,['.amb','.bwt','.ann','.pac','.sa']))
-        @mkdir(self.args.working_dir)        
+        @mkdir(self.args.working_dir)
         @transform([self.args.metaG_contigs+x for x in ['.amb','.bwt','.ann','.pac','.sa'] ], formatter(),
                         # move to working directory
                         os.path.join(self.args.working_dir,"{basename[0]}{ext[0]}"),
@@ -343,9 +348,11 @@ class full_tm_pipeline:
                     logger.info("Map reads [%s] against phiX genome"%(','.join(input_files)))
                     logger.debug("phiX_map: cmdline\n"+ cmd)
                 extern.run(cmd)
-        
-        @transform(phiX_map, suffix(".bam"),".txt",self.logger, self.logging_mutex)
-        def phiX_ID(input_files,output_files,logger, logging_mutex):
+        ###
+        #RKR:
+        #@transform(phiX_map, suffix(".bam"), ".txt", self.logger, self.logging_mutex)
+        ###
+        def phiX_ID(input_files, output_files, logger, logging_mutex):
             """
             Samtools. Get the IDs of PhiX reads
             """
@@ -355,7 +362,11 @@ class full_tm_pipeline:
                     logger.info("Extract ID of phiX reads in %s" %(input_files))
                     logger.debug("phiX_ID: cmdline\n"+ cmd)
                 extern.run(cmd)
-        
+        #RKR:
+        main_pipeline.transform(phiX_ID, phiX_map, suffix(".bam"), ".txt", self.logger, self.logging_mutex)
+        ###
+
+                
         @collate(phiX_ID,formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),'{path[0]}/{BASE[0]}phiX_ID.log','{BASE[0]}',self.logger, self.logging_mutex)
         def phiX_concat_ID(input_files, output_file,basename,logger, logging_mutex):
             """
@@ -385,7 +396,8 @@ class full_tm_pipeline:
         def QC_output(input_files,output_files):
             pass
         
-        @transform(QC_output,suffix(".fq.gz"),add_inputs(phiX_concat_ID),"_phiX_ext.fq",self.logger, self.logging_mutex)
+        ###RKR
+        #@transform(QC_output,suffix(".fq.gz"),add_inputs(phiX_concat_ID),"_phiX_ext.fq",self.logger, self.logging_mutex)
         def phiX_extract(input_files, output_files,logger, logging_mutex):
             """
             Remove PhiX reads
@@ -404,6 +416,8 @@ class full_tm_pipeline:
                         logger.info("No phiX reads in the file: %s"%(input_files[0]))
                         logger.debug("phiX_extract: cmdline\n"+ cmd)
                     extern.run(cmd) 
+        main_pipeline.transform(phiX_extract, QC_output,suffix(".fq.gz"), add_inputs(phiX_concat_ID), "_phiX_ext.fq", self.logger, self.logging_mutex)
+        ###RKR
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_4
@@ -526,16 +540,17 @@ class full_tm_pipeline:
             ## reads filtered : mapped with high stringency
             mapped_reads = stat.count_mapping_reads(flagstat,True)
             self.op_progress(name_sample, 'alignment', 'BamM make', 'filtered reads (2nd)', str(mapped_reads), stat.get_tot_percentage(mapped_reads))
-            
-        @transform(map2ref,formatter('.bam'),"{path[0]}/{basename[0]}_filtered.bam", 
-                   "{path[0]}/{basename[0]}_stringency_filter.log",self.logger, self.logging_mutex)
-        def mapping_filter (input_file, output_file,flagstat,logger,logging_mutex):
+
+        ###RKR
+        #@transform(map2ref,formatter('.bam'),"{path[0]}/{basename[0]}_filtered.bam", 
+        #           "{path[0]}/{basename[0]}_stringency_filter.log",self.logger, self.logging_mutex)
+        def mapping_filter(input_file, output_file,flagstat,logger,logging_mutex):
             """
             BamM filter. Select reads which are mapped with high stringency
             """
             if self.args.no_mapping_filter :  
                 pass 
-            else :
+            else:
                 cmd= "bamm filter --bamfile %s --percentage_id %f --percentage_aln %f -o %s " %(input_file,
                                                                                           self.args.percentage_id,
                                                                                           self.args.percentage_aln,
@@ -557,7 +572,10 @@ class full_tm_pipeline:
                 ## reads filtered : mapped with high stringency
                 mapped_reads_f = stat.count_mapping_reads(flagstat,False)
                 self.op_progress(name_sample, '.bam filter', 'BamM filter', 'mapped reads', str(mapped_reads_f), stat.get_tot_percentage(mapped_reads_f))
-
+        ###RKR
+        main_pipeline.transform(mapping_filter, map2ref,formatter('.bam'), "{path[0]}/{basename[0]}_filtered.bam", 
+            "{path[0]}/{basename[0]}_stringency_filter.log", self.logger, self.logging_mutex)
+                
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_6 (normalized_cov)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -584,7 +602,7 @@ class full_tm_pipeline:
                                                                            self.list_gff[i],
                                                                            coverage_file)
                 with logging_mutex:     
-                    logger.info("Calculte coverage from %s and %s"%(input_file,self.list_gff[i]))  
+                    logger.info("Calculate coverage from %s and %s"%(input_file,self.list_gff[i]))  
                     logger.debug("bam2normalized_cov: cmdline\n"+ cmd)                                       
                 extern.run(cmd)        
                 
@@ -623,7 +641,7 @@ class full_tm_pipeline:
                                                                        input_file,
                                                                        input_file.split('.bam')[0]+'_'+os.path.splitext(os.path.basename((self.list_gff[i])))[0] +'_count.csv')
                 with logging_mutex:     
-                    logger.info("Calculte raw count from %s and %s "%(input_file,gff_no_fasta.name))  
+                    logger.info("Calculate raw count from %s and %s "%(input_file,gff_no_fasta.name))  
                     logger.debug("bam2raw_count: cmdline\n"+ cmd)                                       
                 extern.run(cmd)        
 
@@ -753,19 +771,19 @@ class full_tm_pipeline:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Create the first output: a fastqc report of raw DATA
         
-        subdir_1= os.path.join(self.args.output_dir,"FastQC_raw")
+        subdir_1 = os.path.join(self.args.output_dir, "FastQC_raw")
         # clean the dir (of previous run output)
         try:
             shutil.rmtree(subdir_1)
         except OSError:
             pass          
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         @follows(bam2normalized_cov)
         @mkdir(subdir_1)
         @transform(symlink_to_wd_metaT, formatter(),
                         # move to output directory
                         os.path.join(subdir_1,"{basename[0]}"+"_fastqc.zip"),
                         self.logger, self.logging_mutex)
-           
         def view_raw_data (input_file, soft_link_name, logger, logging_mutex):
             """
             Create a fastQC report in the ouptut directory
@@ -839,7 +857,7 @@ class full_tm_pipeline:
      
      
         subdir_4= os.path.join(self.args.output_dir,"reads_distribution") 
-        @mkdir(subdir_4)              
+        @mkdir(subdir_4)
         @collate(save_log,formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
                  subdir_4+"/{BASE[0]}_reads_stat",'{BASE[0]}')
         def logtable (input_files,output_file,basename):

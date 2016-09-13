@@ -2,44 +2,44 @@
 """ Main callable module to run TranscriptM: a rapid-throughput pipeline of meta-transcriptomes. 
 	See http://http://transcriptm.tiddlyspot.com/
     """
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Developer's temporary playground
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # 3: Created funct further_process_args to run valid_SortMeRNA. Encapsulated funct CustomHelpFormatter into parser_built_with_ruffus."
 # 4. (a) Created funct valid_adapters_fileloc in further_process_args. (b) Indented nicely the description parameter when calling cmdline.get_argparse."
 # 5. Tidied up some formatting of strings, etc. in parser_built_with_ruffus"
 # 7. In transcriptm, implemented funct valid_paired_end to check that all the paired end files exist."
-print "*** 11: Now reference pipeline.py module class Pipeline as full_tm_pipeline."
+print "# 17: enabled pipeline_flow_chart."
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 import os        # miscellaneous operating system interfaces. (Python Standard Library module).
 import argparse  # parser for command-line options, arguments and sub-commands. (Python Standard Library module).
                  # NB. `argparse` only seems to be directly used here to be inherited by another class `CustomHelpFormatter`.
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # External, non-standard modules
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 import ruffus.cmdline as cmdline  # light-weight computational pipeline management. 
                                   # non-standard module. See http://www.ruffus.org.uk.
 import tempdir  # encapsulates temporary directories which just disappear after use. 
                 # non-standard module. See https://pypi.python.org/pypi/tempdir/
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Locally written modules
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 import transcriptm.__init__
 from transcriptm.pipeline import full_tm_pipeline  # custom pipeline class.
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Functions
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def parser_built_with_ruffus(objTempDir):
     ''' returns a command line parser (of type `argparse.ArgumentParser`) that is built with options specific to our program and `ruffus`.
         Parameters: `objTempDir`: a `tempdir.TempDir` object (specifying a working directory to be used if needed).
         '''
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     class CustomHelpFormatter(argparse.HelpFormatter):
         ''' This class is a remodelling of `argparse.HelpFormatter`.
             It is used by being passed as a class, to cmdline.get_argparse(..., formatter_class=CustomHelpFormatter).
@@ -76,7 +76,7 @@ def parser_built_with_ruffus(objTempDir):
             return h
         def _fill_text(self, text, width, indent): # redefinition.
             return ''.join([indent + line for line in text.splitlines(True)])
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Instantiate the parser.
     parser = cmdline.get_argparse(
         description = '\n' \
@@ -93,10 +93,10 @@ def parser_built_with_ruffus(objTempDir):
         version = "transcriptm v{0}".format(transcriptm.__version__),
         formatter_class = CustomHelpFormatter,
         ignored_args = ["recreate_database", "key_legend_in_graph", "just_print", "target_tasks", "jobs",
-                        "use_threads", "forced_tasks", "touch_files_only", "checksum_file_name", 
-                        "flowchart", "draw_graph_horizontally", "flowchart_format"]
+                        "use_threads", "forced_tasks", "touch_files_only", "checksum_file_name"] 
+                        # "flowchart", "draw_graph_horizontally", "flowchart_format"]
         )
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # General options
     #? Coding: Can all of the `dest="..."` parameters be removed (since they don't vary from the --argument name)?
     parser._optionals.title = "General options" # Overwrite the hard-coded title 'optional arguments' for this group of arguments, 
@@ -130,7 +130,7 @@ def parser_built_with_ruffus(objTempDir):
     parser.add_argument("--working_dir", dest="working_dir", 
                         help="Working directory (dynamically created if not specified)", 
                         default=objTempDir.name)
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Trimmomatic options
     trimm_args=parser.add_argument_group('Trimmomatic options')
     trimm_args.add_argument('--adapters', help="Type of adapters to clip ", choices=['nextera', 'truseq'],default= 'truseq')
@@ -140,7 +140,7 @@ def parser_built_with_ruffus(objTempDir):
     trimm_args.add_argument('--min_qc', help="Minimum quality score for leading and trailing bases ", type=int, default = 20)
     trimm_args.add_argument('--crop', help="Cut read to a specific length ", type=int, default = 10000)
     trimm_args.add_argument('--headcrop', help="Cut specified number of bases from start of read ", type=int, default = 0)
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # SortMeRNA options
     sortmerna_args=parser.add_argument_group('SortMeRNA options')    
     if db_path:
@@ -174,22 +174,22 @@ def parser_built_with_ruffus(objTempDir):
             help="Path to databases and index\n e.g. path_db1,path_index1:path_db2,path_index2\n" + \
                  "NB: index must be created with the script sortmerna/2.0/bin/indexdb_rna",
             required=True)
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Mapping options (BamM filter)
     mapping_args=parser.add_argument_group('Mapping options (BamM filter)')
     mapping_args.add_argument('--percentage_id', type=float, dest='percentage_id', help='Minimum allowable percentage base identity of a mapped read', default=0.97)
     mapping_args.add_argument('--percentage_aln', type=float, dest='percentage_aln', help='Minimum allowable percentage read bases mapped', default=0.95)
     mapping_args.add_argument('--no_mapping_filter',  action="store_true", dest='no_mapping_filter', help='Do not adjust the mapping stringency by filtering alignments', default=False)
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     return parser
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def further_process_args(args):
     """ performs further validations on `args` (parsed command-line arguments), 
         and creates additional derived args in that namespace.
         """
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def valid_paired_end():
         """ checks that all the paired end files exist.
             """
@@ -197,7 +197,7 @@ def further_process_args(args):
             if not os.path.isfile(filename):
                 raise Exception("File <{0}> specified in --paired_end does not exist.".format(filename))
                 exit(1)
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def valid_adapters_fileloc():
         """ creates a new arg `adaptersFile`, pointing to an expected file location under `db_path`, 
             and tests for the presence of that file.
@@ -219,7 +219,7 @@ def further_process_args(args):
                 "The subdirectory `0-Adapters` or the file `%s` does not exist in `%s` (the db_path provided)"
                 %(os.path.basename(args.adaptersFile), args.db_path))
             exit(1) #? Is this line needed after raising an exception?
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~           
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def valid_SortMeRNA():
         """ performs cursory validation that the SortMeRNA database is indexed.
         """
@@ -235,13 +235,13 @@ def further_process_args(args):
                 "No index found for SortMeRNA database.\n Use the cmdline below: \n" + \
                 "sortmerna/2.0/bin/indexdb_rna --ref path_db1,path_index1:path_db2,path_index2 ")
             exit(1) #? Is this line needed after raising an exception?
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~           
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     valid_paired_end()
     valid_adapters_fileloc()
     valid_SortMeRNA()
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def main_prog():
     """ runs the main program for TranscriptM.
         """

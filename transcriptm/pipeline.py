@@ -16,13 +16,15 @@
 # 17: enabled pipeline_flow_chart."
 # 18: Testing ruffus OO Stage 5b."
 # 19: Testing ruffus OO subdivide(bam2normalized_cov, # Stage 6a"
-# 20: subdivide(sortmerna, # Stage 4; transform(map2ref, # Stage 5b; subdivide(bam2raw_count, # Stage 6b; merge(concatenate_logtables, # Stage T4b"
+# 20: subdivide(sortmerna, # Stage 4; transform(map2ref, # Stage 5b; subdivide(bam2raw_count, # Stage 6b; 
+#     merge(concatenate_logtables, # Stage T4b"
 # 21: collate(trimmomatic, # Stage 2a; subdivide(phiX_map, # Stage 3a; collate(concat_for_mapping, # Stage 5a"
 # 22: Tidy-up." 
 # 23: Further tidy-up." 
 # 24: Try named parameters from transform(task_func = phiX_ID, ..." 
 # 25: Try named parameters from transform(task_func = phiX_extract, ... add_inputs ..."
-print "26: Rename main_pl to rpl (ruffus pipeline)."
+# 26: Rename main_pl to rpl (ruffus pipeline)."
+print "27: Reduced code width to 121 characters (visible in Github, half screen)."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -90,8 +92,10 @@ class full_tm_pipeline:
                 """
             self.alias_pe = {}  
             for i in range(int(len(self.args.paired_end)/2)): # Loop an index through the pairs in the `paired_end` list.
-                self.alias_pe[os.path.join(self.args.working_dir, 'sample-'+str(i)+'_R1.fq.gz')] = self.args.paired_end[2*i]
-                self.alias_pe[os.path.join(self.args.working_dir, 'sample-'+str(i)+'_R2.fq.gz')] = self.args.paired_end[2*i+1]
+                self.alias_pe[os.path.join(self.args.working_dir, 'sample-'+str(i)+'_R1.fq.gz')] = \
+                    self.args.paired_end[2*i]
+                self.alias_pe[os.path.join(self.args.working_dir, 'sample-'+str(i)+'_R2.fq.gz')] = \
+                    self.args.paired_end[2*i+1]
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def presto_prefix_pe():
             """ populates dictionary `self.prefix_pe`:
@@ -134,7 +138,8 @@ class full_tm_pipeline:
                 count = int(subprocess.check_output("zcat %s | wc -l " % \
                                                 (self.args.paired_end[2*i]), shell=True).split(' ')[0])/4 
                 self.tot_pe[self.prefix_pe['sample-'+str(i)]]=count
-                self.op_progress(self.prefix_pe['sample-'+str(i)], 'raw data', 'FastQC-check', 'raw reads', str(count), '100.00 %')
+                self.op_progress( \
+                    self.prefix_pe['sample-'+str(i)], 'raw data', 'FastQC-check', 'raw reads', str(count), '100.00 %')
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def setup_logging():
             """ sets up Ruffus' standard python logger, which can be synchronised across concurrent Ruffus tasks.
@@ -166,7 +171,8 @@ class full_tm_pipeline:
             """
         # Guard against soft linking to oneself: Disastrous consequences of deleting the original files
         if input_file == soft_link_name:
-            logger.debug("Warning: No symbolic link made. You are using the original data directory as the working directory.")
+            logger.debug("Warning: No symbolic link made. " + \
+                "You are using the original data directory as the working directory.")
             return
         # Soft link already exists: delete for relink?
         if os.path.lexists(soft_link_name):
@@ -302,7 +308,7 @@ class full_tm_pipeline:
 #                 regex("R[12].fq.gz$"),
 #                 ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"],"trimmomatic.log",
 #                 self.logger, self.logging_mutex)
-        def trimmomatic(input_files, output_file,log,logger, logging_mutex):
+        def trimmomatic(input_files, output_file,log, logger, logging_mutex):
             """
             Trimmomatic. Trim and remove adapters of paired reads
             """  
@@ -412,17 +418,18 @@ class full_tm_pipeline:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 3c
 #        @collate(phiX_ID,formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),'{path[0]}/{BASE[0]}phiX_ID.log','{BASE[0]}',self.logger, self.logging_mutex)
-        def phiX_concat_ID(input_files, output_file,basename,logger, logging_mutex):
+        def phiX_concat_ID(input_files, output_file, basename, logger, logging_mutex):
             """
             Concatenate all PhiX ID found previously
             """
-            cmd ="cat %s %s %s | uniq > %s" %(input_files[0],
+            cmd = "cat %s %s %s | uniq > %s" %(
+                                        input_files[0],
                                         input_files[1],
                                         input_files[2],
                                         output_file)
             with logging_mutex:
                 logger.info("Concatenate all ID of phiX reads [%s]"%(','.join(input_files)))
-                logger.debug("phiX_concat_ID: cmdline\n"+ cmd)
+                logger.debug("phiX_concat_ID: cmdline\n" + cmd)
             extern.run(cmd) 
        
            #  ~~~~ monitoring: count of reads  ~~~~ #                 
@@ -430,7 +437,8 @@ class full_tm_pipeline:
             stat= Monitoring(self.tot_pe[name_sample])
             ## non phiX reads
             trimm_file = os.path.join(self.args.working_dir,
-                  [f for f in os.listdir(self.args.working_dir) if re.search(r'%s.*trimmomatic.log'%(basename.split('_')[0]), f)][0])     
+                  [f for f in os.listdir(self.args.working_dir) \
+                      if re.search(r'%s.*trimmomatic.log'%(basename.split('_')[0]), f)][0])     
             processed_reads = stat.count_processed_reads(trimm_file)
             phiX_reads = int(subprocess.check_output("wc -l "+output_file, shell=True).split(' ')[0])
             non_phiX_reads = processed_reads - phiX_reads
@@ -443,7 +451,7 @@ class full_tm_pipeline:
             ruffus.formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),
             '{path[0]}/{BASE[0]}phiX_ID.log','{BASE[0]}',
             self.logger, self.logging_mutex)
-        
+
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 3d
         #@subdivide(trimmomatic,regex(r"trimm_[UP][12].fq.gz"),["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"])
@@ -458,19 +466,19 @@ class full_tm_pipeline:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 3e
         #@transform(QC_output,suffix(".fq.gz"),add_inputs(phiX_concat_ID),"_phiX_ext.fq",self.logger, self.logging_mutex)
-        def phiX_extract(input_files, output_files,logger, logging_mutex):
+        def phiX_extract(input_files, output_files, logger, logging_mutex):
             """
             Remove PhiX reads
             """
             try:
-                cmd ="fxtract -S -H -f %s -z -v %s > %s" %(input_files[1], input_files[0],output_files)
+                cmd = "fxtract -S -H -f %s -z -v %s > %s" %(input_files[1], input_files[0], output_files)
                 with logging_mutex:
                     logger.info("Extract phiX reads in the file %s"%(input_files[0]))
                     logger.debug("phiX_extract: cmdline\n"+ cmd)
                 extern.run(cmd) 
             #flag -z if gzip input file
             except subprocess.CalledProcessError:
-                cmd ="gzip  -cd %s > %s" %(input_files[0],output_files)
+                cmd ="gzip  -cd %s > %s" %(input_files[0], output_files)
                 with logging_mutex:
                     logger.info("No phiX reads in the file: %s"%(input_files[0]))
                     logger.debug("phiX_extract: cmdline\n"+ cmd)
@@ -492,7 +500,7 @@ class full_tm_pipeline:
         # Stage 4
 #        @subdivide(phiX_extract,formatter(), "{path[0]}/{basename[0]}_non_ncRNA.fq",
 #                   "{path[0]}/{basename[0]}_ncRNA.fq",self.logger, self.logging_mutex)
-        def sortmerna(input_files, output_files, ncRNA_files,logger, logging_mutex):    
+        def sortmerna(input_files, output_files, ncRNA_files, logger, logging_mutex):    
             """
             SortMeRNA. Remove non-coding RNA
             """
@@ -527,16 +535,21 @@ class full_tm_pipeline:
             """
             Prepare .fq files for the mapping stage
             """
-            cmd_ID="comm -3 <(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s |sort) <(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s | sort) | awk  '{print $1 $2}' > %s"  %(input_files[0], input_files[1],ID_single)
-            cmd_paired= "fxtract -H -S -f '%s' -v %s > %s;fxtract -H -S -f '%s' -v %s > %s" % \
-                    (ID_single,
+            cmd_ID="comm -3 <(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s |sort) <(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s | sort) | awk  '{print $1 $2}' > %s" %(input_files[0], input_files[1],ID_single)            
+#            cmd_ID = "comm -3 <(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s |sort) " + \
+#                    "<(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s | sort) | awk  '{print $1 $2}' > %s"%(\
+#                    input_files[0], 
+#                    input_files[1], 
+#                    ID_single)
+            cmd_paired = "fxtract -H -S -f '%s' -v %s > %s;fxtract -H -S -f '%s' -v %s > %s"%(
+                    ID_single,
                     input_files[0],
                     output_files[0],
                     ID_single,
                     input_files[1],
                     output_files[1])                                                          
-            cmd_single = "cat %s %s > %s; fxtract -H -S -f '%s' %s %s >> %s"  % \
-                    (input_files[2],
+            cmd_single = "cat %s %s > %s; fxtract -H -S -f '%s' %s %s >> %s" %( \
+                    input_files[2],
                     input_files[3],
                     output_files[2],
                     ID_single,
@@ -544,7 +557,8 @@ class full_tm_pipeline:
                     input_files[1],
                     output_files[2])
             with logging_mutex:
-                logger.info("Find IDs of single reads generated with SortMeRNA in (%s,%s)" %(input_files[0], input_files[1]))
+                logger.info("Find IDs of single reads generated with SortMeRNA in (%s,%s)" %( \
+                    input_files[0], input_files[1]))
                 logger.debug("concat_for_mapping: cmdline\n"+ cmd_ID)            
             #subprocess.check_call(['bash','-c',cmd_ID])
             extern.run(cmd_ID)
@@ -598,8 +612,8 @@ class full_tm_pipeline:
             else:
                 # index doesn't exist yet -> bamm keep        
                 index_exists='k'
-            cmd = "bamm make -d %s -c %s %s -s %s -o %s --threads %d -%s --quiet" % \
-                    (input_files[1],
+            cmd = "bamm make -d %s -c %s %s -s %s -o %s --threads %d -%s --quiet"%(
+                    input_files[1],
                     input_files[0][0],
                     input_files[0][1],
                     input_files[0][2],
@@ -656,8 +670,8 @@ class full_tm_pipeline:
             if self.args.no_mapping_filter :  
                 pass 
             else:
-                cmd = "bamm filter --bamfile %s --percentage_id %f --percentage_aln %f -o %s " % \
-                    (input_file,
+                cmd = "bamm filter --bamfile %s --percentage_id %f --percentage_aln %f -o %s "%(
+                    input_file,
                     self.args.percentage_id,
                     self.args.percentage_aln,
                     self.args.working_dir)
@@ -666,7 +680,7 @@ class full_tm_pipeline:
                     logger.debug("mapping_filter: cmdline\n"+ cmd)  
                 extern.run(cmd)
 
-                cmd3 = "samtools flagstat %s > %s " %(output_file,flagstat)
+                cmd3 = "samtools flagstat %s > %s " %(output_file, flagstat)
                 with logging_mutex:     
                     logger.info("Compute statistics of %(input_file)s (samtools flastat)" % locals())
                     logger.debug("mapping_filter: cmdline\n"+ cmd3)  
@@ -698,7 +712,7 @@ class full_tm_pipeline:
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #        @subdivide(bam_file,formatter(),'{path[0]}/*normalized_cov.csv','{path[0]}/coverage.csv' ,self.args.dir_bins,self.logger, self.logging_mutex)
-        def bam2normalized_cov(input_file, output_file,coverage_file, dir_bins,logger, logging_mutex):
+        def bam2normalized_cov(input_file, output_file, coverage_file, dir_bins,logger, logging_mutex):
             """
             Dirseq (compute coverage values) +  coverage2normalized_cov
             """
@@ -711,29 +725,32 @@ class full_tm_pipeline:
             #f.close()                                                                #
 
             for i in range(len(self.list_gff)):
-                cmd ="dirseq --bam %s --gff %s --ignore-directions -q>  %s " %(input_file,
-                                                                           self.list_gff[i],
-                                                                           coverage_file)
+                cmd = "dirseq --bam %s --gff %s --ignore-directions -q>  %s "%(\
+                        input_file, self.list_gff[i], coverage_file)
                 with logging_mutex:     
                     logger.info("Calculate coverage from %s and %s"%(input_file,self.list_gff[i]))  
                     logger.debug("bam2normalized_cov: cmdline\n"+ cmd)                                       
                 extern.run(cmd)        
                 
                 if lib_size != 0:
-                    cmd1 = "sed 's/\t/|/g' %s | awk  -F '|' 'NR>=2 {$6= $6/%d*10e6}1' OFS='|' |  sed 's/|/\t/g' > %s ; rm %s " % \
-                        (coverage_file,
+#                    cmd1 = "sed 's/\t/|/g' %s | awk  -F '|' 'NR>=2 {$6= $6/%d*10e6}1' OFS='|' |  " + \
+#                            "sed 's/|/\t/g' > %s ; rm %s "%( \
+                    cmd1 = "sed 's/\t/|/g' %s | awk  -F '|' 'NR>=2 {$6= $6/%d*10e6}1' OFS='|' |  sed 's/|/\t/g' > %s ; rm %s " %( \
+                        coverage_file,
                         lib_size,
-                        input_file.split('.bam')[0]+'_'+ os.path.splitext(os.path.basename((self.list_gff[i])))[0]+'_normalized_cov.csv',
-                        coverage_file )
+                        input_file.split('.bam')[0]+'_'+ 
+                            os.path.splitext(os.path.basename((self.list_gff[i])))[0]+'_normalized_cov.csv',
+                        coverage_file)
                 else:
-                    cmd1 = "cp %s %s; rm %s "% \
-                        (coverage_file,
-                        input_file.split('.bam')[0]+'_'+ os.path.splitext(os.path.basename((self.list_gff[i])))[0]+'_normalized_cov.csv',
+                    cmd1 = "cp %s %s; rm %s "%( \
+                        coverage_file,
+                        input_file.split('.bam')[0]+'_'+ 
+                            os.path.splitext(os.path.basename((self.list_gff[i])))[0]+'_normalized_cov.csv',
                         coverage_file)
                     
                 with logging_mutex:     
                     logger.info("Convert coverage to normalized_cov")
-                    logger.debug("bam2normalized_cov: cmdline\n"+ cmd1)
+                    logger.debug("bam2normalized_cov: cmdline\n" + cmd1)
                 extern.run(cmd1)                
 
         rpl.subdivide(bam2normalized_cov, # Stage 6a
@@ -768,7 +785,8 @@ class full_tm_pipeline:
                 cmd = "bedtools intersect -c -a %s -b %s -bed >  %s " % \
                     (gff_no_fasta.name,
                     input_file,
-                    input_file.split('.bam')[0]+'_'+os.path.splitext(os.path.basename((self.list_gff[i])))[0] +'_count.csv')
+                    input_file.split('.bam')[0]+'_'+
+                        os.path.splitext(os.path.basename((self.list_gff[i])))[0] +'_count.csv')
                 with logging_mutex:     
                     logger.info("Calculate raw count from %s and %s "%(input_file, gff_no_fasta.name))  
                     logger.debug("bam2raw_count: cmdline\n"+ cmd)                                       
@@ -786,13 +804,17 @@ class full_tm_pipeline:
 
         # Concatenate all the normalized_cov results in a table
         @mkdir(self.args.output_dir)
-        @merge(bam2normalized_cov,os.path.join(self.args.output_dir,os.path.basename(self.args.output_dir)+'_NORM_COVERAGE.csv'),self.logger, self.logging_mutex)
+        @merge(bam2normalized_cov, \
+            os.path.join(self.args.output_dir,os.path.basename(self.args.output_dir)+'_NORM_COVERAGE.csv'), \
+            self.logger, self.logging_mutex)
         def transcriptM_table (input_files, output_file, logger, logging_mutex): 
             """
             Create one table that contains RPKM values for each gene of each bin for the different samples
             """
             input_files=list(set(input_files))      
-            if len(input_files)==0: raise Exception("Incorrect input detected. Likely causes: \n\tOnly one sequence file sumitted\n\tAssembly file has been tampered with")
+            if len(input_files)==0: 
+                raise Exception("Incorrect input detected. Likely causes: " + \
+                    "\n\tOnly one sequence file sumitted\n\tAssembly file has been tampered with")
             normalized_cov_col= [list([]) for _ in xrange(int(len(self.args.paired_end)/2)+3)]       
             # headers of cols ->  0, n-1, n
             normalized_cov_col[0].append('bin_ID')
@@ -827,7 +849,8 @@ class full_tm_pipeline:
                 for i in range(len(files_b)):
                     # create header of normalized_cov cols
                     if not normalized_cov_col[i+1]:
-                        normalized_cov_col[i+1].append('normalized_cov_'+self.prefix_pe[os.path.basename(files_b[i]).split('_')[0]])
+                        normalized_cov_col[i+1].append( \
+                            'normalized_cov_'+self.prefix_pe[os.path.basename(files_b[i]).split('_')[0]])
                     with open(files_b[i],'r') as csvfile:                    
                         reader = csv.reader(csvfile, delimiter='\t')                      
                         next(reader) # skip header  
@@ -839,7 +862,8 @@ class full_tm_pipeline:
             numpy.savetxt(output_file, numpy.transpose(tab), delimiter='\t', fmt="%s") 
             
             with logging_mutex:     
-                logger.info("Create table that contains normalized_cov values for each gene of each bin given as input for the different samples: %s"%(','.join(self.prefix_pe.values())))    
+                logger.info("Create table that contains normalized_cov values for each gene of each bin given " + \
+                    "as input for the different samples: %s" %(','.join(self.prefix_pe.values())))    
             
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_7 BIS (raw count table)
@@ -901,7 +925,8 @@ class full_tm_pipeline:
             numpy.savetxt(output_file,numpy.transpose(tab),delimiter='\t', fmt="%s") 
             
             with logging_mutex:     
-                logger.info("Create table that contains raw count values for each gene of each bin given as input for the different samples: %s"%(','.join(self.prefix_pe.values())))    
+                logger.info("Create table that contains raw count values for each gene of each bin given as input " + \
+                    "for the different samples: %s"%(','.join(self.prefix_pe.values())))    
     
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: TRACE FILE N_1
@@ -1001,8 +1026,10 @@ class full_tm_pipeline:
         subdir_4 = os.path.join(self.args.output_dir, "reads_distribution") 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         @mkdir(subdir_4)
-        @collate(save_log, ruffus.formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
-                 subdir_4+"/{BASE[0]}_reads_stat",'{BASE[0]}')
+        @collate(save_log, 
+            ruffus.formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|" + \
+                "(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
+            subdir_4+"/{BASE[0]}_reads_stat",'{BASE[0]}')
         def logtable(input_files, output_file, basename):
             """
             Sums up the count of reads which are kept after each step 

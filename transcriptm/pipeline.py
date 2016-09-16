@@ -17,7 +17,8 @@
 # 18: Testing ruffus OO Stage 5b."
 # 19: Testing ruffus OO subdivide(bam2normalized_cov, # Stage 6a"
 # 20: subdivide(sortmerna, # Stage 4; transform(map2ref, # Stage 5b; subdivide(bam2raw_count, # Stage 6b; merge(concatenate_logtables, # Stage T4b"
-print "#21: collate(trimmomatic, # Stage 2a; subdivide(phiX_map, # Stage 3a; collate(concat_for_mapping, # Stage 5a"
+# 21: collate(trimmomatic, # Stage 2a; subdivide(phiX_map, # Stage 3a; collate(concat_for_mapping, # Stage 5a"
+print "22: Tidy-up."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -39,7 +40,7 @@ import numpy         # array processing for numbers, strings, records, objects. 
 import ruffus        # light-weight computational pipeline management. See http://www.ruffus.org.uk
 #RKR: Remove theses once ruffus decorators are gone.
 from ruffus import collate, follows, merge, originate, transform ### subdivide # ruffus decorators.
-from ruffus import suffix, regex, formatter, add_inputs                      # ruffus filter / indicators.
+from ruffus import regex, formatter, add_inputs ### , suffix                 # ruffus filter / indicators.
 from ruffus import active_if, mkdir                                          # ruffus other.
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -229,6 +230,7 @@ class full_tm_pipeline:
     def pipeline_stages(self):
         ''' defines all the pipelined functions and runs them.
             '''
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Decorated functions are automatically part of a default constructed Pipeline named "main".
         main_pl = ruffus.Pipeline.pipelines["main"]
 
@@ -237,6 +239,7 @@ class full_tm_pipeline:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Create symbolic link of inputs files in the working directory
         
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         #RKR
         @mkdir(self.args.working_dir)
         @originate(self.alias_pe.keys(), self.logger, self.logging_mutex)
@@ -253,6 +256,7 @@ class full_tm_pipeline:
 #            .originate(symlink_to_wd_metaT, self.alias_pe.keys(), self.logger, self.logging_mutex)\
 #            .follows(mkdir(self.args.working_dir))
             
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         @mkdir(self.args.working_dir)
         @transform(self.args.metaG_contigs, formatter(),
                         # move to working directory
@@ -266,6 +270,7 @@ class full_tm_pipeline:
                 logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
             self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
         
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # check if bwa index are present 
         @active_if(self.has_index(self.args.metaG_contigs,['.amb','.bwt','.ann','.pac','.sa']))
         @mkdir(self.args.working_dir)
@@ -369,6 +374,7 @@ class full_tm_pipeline:
              "{path[0]}/phiX.{BASE[0]}U2.bam"], 
             self.logger, self.logging_mutex)
 
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         #RKR:
         #@transform(phiX_map, suffix(".bam"), ".txt", self.logger, self.logging_mutex)
         ###
@@ -381,11 +387,14 @@ class full_tm_pipeline:
                 logger.info("Extract ID of phiX reads in %s" %(input_files))
                 logger.debug("phiX_ID: cmdline\n"+ cmd)
             extern.run(cmd)
-        #RKR:
-        main_pl.transform(phiX_ID, phiX_map, suffix(".bam"), ".txt", self.logger, self.logging_mutex)
-        ###
+
+        main_pl.transform(phiX_ID, 
+            phiX_map, 
+            ruffus.suffix(".bam"), 
+            ".txt", 
+            self.logger, self.logging_mutex)
                 
-        #RKR:
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 3c
 #        @collate(phiX_ID,formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),'{path[0]}/{BASE[0]}phiX_ID.log','{BASE[0]}',self.logger, self.logging_mutex)
         def phiX_concat_ID(input_files, output_file,basename,logger, logging_mutex):
@@ -417,7 +426,7 @@ class full_tm_pipeline:
             '{path[0]}/{BASE[0]}phiX_ID.log','{BASE[0]}',
             self.logger, self.logging_mutex)
         
-        #RKR:
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 3d
         #@subdivide(trimmomatic,regex(r"trimm_[UP][12].fq.gz"),["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"])
         def QC_output(input_files, output_files):
@@ -428,7 +437,8 @@ class full_tm_pipeline:
             regex(r"trimm_[UP][12].fq.gz"),
             ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"])
 
-        ###RKR
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Stage 3e
         #@transform(QC_output,suffix(".fq.gz"),add_inputs(phiX_concat_ID),"_phiX_ext.fq",self.logger, self.logging_mutex)
         def phiX_extract(input_files, output_files,logger, logging_mutex):
             """
@@ -447,14 +457,20 @@ class full_tm_pipeline:
                     logger.info("No phiX reads in the file: %s"%(input_files[0]))
                     logger.debug("phiX_extract: cmdline\n"+ cmd)
                 extern.run(cmd) 
-        main_pl.transform(phiX_extract, QC_output,suffix(".fq.gz"), add_inputs(phiX_concat_ID), "_phiX_ext.fq", self.logger, self.logging_mutex)
-        ###RKR
+                
+        main_pl.transform(phiX_extract, # Stage 3e
+            QC_output,
+            ruffus.suffix(".fq.gz"), 
+            add_inputs(phiX_concat_ID), 
+            "_phiX_ext.fq", 
+            self.logger, self.logging_mutex)
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_4
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Third step in the QC process: remove rRNA, tRNA ...
         
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 4
 #        @subdivide(phiX_extract,formatter(), "{path[0]}/{basename[0]}_non_ncRNA.fq",
 #                   "{path[0]}/{basename[0]}_ncRNA.fq",self.logger, self.logging_mutex)
@@ -488,24 +504,26 @@ class full_tm_pipeline:
         #RKR
 #        @collate(sortmerna,regex(r"trimm_.*"),["concat_paired_R1.fq","concat_paired_R2.fq","concat_single.fq"],
 #                 "ID_single.txt", self.logger, self.logging_mutex)
-        def concat_for_mapping(input_files, output_files,ID_single,logger, logging_mutex):
+        def concat_for_mapping(input_files, output_files, ID_single, logger, logging_mutex):
             """
             Prepare .fq files for the mapping stage
             """
             cmd_ID="comm -3 <(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s |sort) <(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s | sort) | awk  '{print $1 $2}' > %s"  %(input_files[0], input_files[1],ID_single)
-            cmd_paired= "fxtract -H -S -f '%s' -v %s > %s;fxtract -H -S -f '%s' -v %s > %s"  %(ID_single,
-                                                                                               input_files[0],
-                                                                                               output_files[0],
-                                                                                               ID_single,
-                                                                                               input_files[1],
-                                                                                               output_files[1])                                                          
-            cmd_single="cat %s %s > %s; fxtract -H -S -f '%s' %s %s >> %s"  %(input_files[2],
-                                                                              input_files[3],
-                                                                              output_files[2],
-                                                                              ID_single,
-                                                                              input_files[0],
-                                                                              input_files[1],
-                                                                              output_files[2])
+            cmd_paired= "fxtract -H -S -f '%s' -v %s > %s;fxtract -H -S -f '%s' -v %s > %s" % \
+                    (ID_single,
+                    input_files[0],
+                    output_files[0],
+                    ID_single,
+                    input_files[1],
+                    output_files[1])                                                          
+            cmd_single = "cat %s %s > %s; fxtract -H -S -f '%s' %s %s >> %s"  % \
+                    (input_files[2],
+                    input_files[3],
+                    output_files[2],
+                    ID_single,
+                    input_files[0],
+                    input_files[1],
+                    output_files[2])
             with logging_mutex:
                 logger.info("Find IDs of single reads generated with SortMeRNA in (%s,%s)" %(input_files[0], input_files[1]))
                 logger.debug("concat_for_mapping: cmdline\n"+ cmd_ID)            
@@ -541,15 +559,15 @@ class full_tm_pipeline:
         #1. .bam files generated with 'BamM' only contain the mapped reads -> be carful with the interpretation of samtools flagstat
         #2. only one alignment per read is kept: the secondary and supplementary are removed
 
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 5b)        
-# RKR:
 #        @transform(concat_for_mapping,formatter(r"(.+)/(?P<BASE>.*)_concat_paired_R1.fq"),
 #                   add_inputs(symlink_to_wd_metaG),"{path[0]}/{BASE[0]}.bam",
 #                   ["{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[0]}.bam",
 #                    "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[2]}.bam",
 #                    "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+"{BASE[0]}_merged.bam"],
 #                    "{path[0]}/{BASE[0]}_mapping.log",self.logger, self.logging_mutex)
-        def map2ref (input_files, output_file, bams,flagstat,logger,logging_mutex):
+        def map2ref (input_files, output_file, bams, flagstat, logger, logging_mutex):
             """
             BamM make. Map all metatranscriptomics reads against metagenomics contigs
             """
@@ -593,8 +611,7 @@ class full_tm_pipeline:
             self.op_progress(name_sample, 'alignment', 'BamM make', 'filtered reads (2nd)', str(mapped_reads), stat.get_tot_percentage(mapped_reads))
 
 # RKR:
-        main_pl.transform(
-            map2ref, # Stage 5b
+        main_pl.transform(map2ref, # Stage 5b
             concat_for_mapping, 
             formatter(r"(.+)/(?P<BASE>.*)_concat_paired_R1.fq"),
             add_inputs(symlink_to_wd_metaG),
@@ -605,26 +622,28 @@ class full_tm_pipeline:
             "{path[0]}/{BASE[0]}_mapping.log",
             self.logger, self.logging_mutex)
 
-        ###RKR
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Stage 5c
         #@transform(map2ref,formatter('.bam'),"{path[0]}/{basename[0]}_filtered.bam", 
         #           "{path[0]}/{basename[0]}_stringency_filter.log",self.logger, self.logging_mutex)
-        def mapping_filter(input_file, output_file,flagstat,logger,logging_mutex):
+        def mapping_filter(input_file, output_file, flagstat, logger, logging_mutex):
             """
             BamM filter. Select reads which are mapped with high stringency
             """
             if self.args.no_mapping_filter :  
                 pass 
             else:
-                cmd= "bamm filter --bamfile %s --percentage_id %f --percentage_aln %f -o %s " %(input_file,
-                                                                                          self.args.percentage_id,
-                                                                                          self.args.percentage_aln,
-                                                                                          self.args.working_dir)
+                cmd = "bamm filter --bamfile %s --percentage_id %f --percentage_aln %f -o %s " % \
+                    (input_file,
+                    self.args.percentage_id,
+                    self.args.percentage_aln,
+                    self.args.working_dir)
                 with logging_mutex:     
                     logger.info("Filter %(input_file)s" % locals())
                     logger.debug("mapping_filter: cmdline\n"+ cmd)  
                 extern.run(cmd)
 
-                cmd3= "samtools flagstat %s > %s " %(output_file,flagstat)
+                cmd3 = "samtools flagstat %s > %s " %(output_file,flagstat)
                 with logging_mutex:     
                     logger.info("Compute statistics of %(input_file)s (samtools flastat)" % locals())
                     logger.debug("mapping_filter: cmdline\n"+ cmd3)  
@@ -637,8 +656,11 @@ class full_tm_pipeline:
                 mapped_reads_f = stat.count_mapping_reads(flagstat,False)
                 self.op_progress(name_sample, '.bam filter', 'BamM filter', 'mapped reads', str(mapped_reads_f), stat.get_tot_percentage(mapped_reads_f))
 
-        main_pl.transform(mapping_filter, map2ref,formatter('.bam'), "{path[0]}/{basename[0]}_filtered.bam", 
-            "{path[0]}/{basename[0]}_stringency_filter.log", self.logger, self.logging_mutex)
+        main_pl.transform(mapping_filter, # Stage 5c
+            map2ref,formatter('.bam'), 
+            "{path[0]}/{basename[0]}_filtered.bam", 
+            "{path[0]}/{basename[0]}_stringency_filter.log", 
+            self.logger, self.logging_mutex)
                 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_6 (normalized_cov)
@@ -649,7 +671,7 @@ class full_tm_pipeline:
         else: 
             bam_file= mapping_filter
 
-        # RKR:
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #        @subdivide(bam_file,formatter(),'{path[0]}/*normalized_cov.csv','{path[0]}/coverage.csv' ,self.args.dir_bins,self.logger, self.logging_mutex)
         def bam2normalized_cov(input_file, output_file,coverage_file, dir_bins,logger, logging_mutex):
             """
@@ -672,22 +694,24 @@ class full_tm_pipeline:
                     logger.debug("bam2normalized_cov: cmdline\n"+ cmd)                                       
                 extern.run(cmd)        
                 
-                if lib_size !=0:
-                    cmd1= "sed 's/\t/|/g' %s | awk  -F '|' 'NR>=2 {$6= $6/%d*10e6}1' OFS='|' |  sed 's/|/\t/g' > %s ; rm %s " %(coverage_file,
-                                                                                                                       lib_size,
-                                                                                                                       input_file.split('.bam')[0]+'_'+ os.path.splitext(os.path.basename((self.list_gff[i])))[0]+'_normalized_cov.csv',
-                                                                                                                       coverage_file )
+                if lib_size != 0:
+                    cmd1 = "sed 's/\t/|/g' %s | awk  -F '|' 'NR>=2 {$6= $6/%d*10e6}1' OFS='|' |  sed 's/|/\t/g' > %s ; rm %s " % \
+                        (coverage_file,
+                        lib_size,
+                        input_file.split('.bam')[0]+'_'+ os.path.splitext(os.path.basename((self.list_gff[i])))[0]+'_normalized_cov.csv',
+                        coverage_file )
                 else:
-                    cmd1= "cp %s %s; rm %s "%(coverage_file,input_file.split('.bam')[0]+'_'+ os.path.splitext(os.path.basename((self.list_gff[i])))[0]+'_normalized_cov.csv',coverage_file)
+                    cmd1 = "cp %s %s; rm %s "% \
+                        (coverage_file,
+                        input_file.split('.bam')[0]+'_'+ os.path.splitext(os.path.basename((self.list_gff[i])))[0]+'_normalized_cov.csv',
+                        coverage_file)
                     
                 with logging_mutex:     
                     logger.info("Convert coverage to normalized_cov")
                     logger.debug("bam2normalized_cov: cmdline\n"+ cmd1)
                 extern.run(cmd1)                
 
-        # RKR:
-        main_pl.subdivide(
-            bam2normalized_cov, # Stage 6a
+        main_pl.subdivide(bam2normalized_cov, # Stage 6a
             bam_file, 
             formatter(),
             '{path[0]}/*normalized_cov.csv',
@@ -705,7 +729,8 @@ class full_tm_pipeline:
         else: 
             bam_file= mapping_filter
 
-        # RKR: Stage 6b  
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Stage 6b  
 #        @subdivide(bam_file,formatter(),'{path[0]}/*count.csv',self.list_gff,self.logger, self.logging_mutex)
         def bam2raw_count(input_file, output_file, list_gff,logger, logging_mutex):
             """
@@ -715,15 +740,15 @@ class full_tm_pipeline:
                 gff_no_fasta= tempfile.NamedTemporaryFile(prefix='transcriptm', suffix='.gff')
                 cmd0 = "sed '/^##FASTA$/,$d' %s > %s" %(self.list_gff[i], gff_no_fasta.name)
                 extern.run(cmd0)
-                cmd ="bedtools intersect -c -a %s -b %s -bed >  %s " %( gff_no_fasta.name,
-                                                                       input_file,
-                                                                       input_file.split('.bam')[0]+'_'+os.path.splitext(os.path.basename((self.list_gff[i])))[0] +'_count.csv')
+                cmd = "bedtools intersect -c -a %s -b %s -bed >  %s " % \
+                    (gff_no_fasta.name,
+                    input_file,
+                    input_file.split('.bam')[0]+'_'+os.path.splitext(os.path.basename((self.list_gff[i])))[0] +'_count.csv')
                 with logging_mutex:     
-                    logger.info("Calculate raw count from %s and %s "%(input_file,gff_no_fasta.name))  
+                    logger.info("Calculate raw count from %s and %s "%(input_file, gff_no_fasta.name))  
                     logger.debug("bam2raw_count: cmdline\n"+ cmd)                                       
                 extern.run(cmd)        
 
-        # RKR:        
         main_pl.subdivide(bam2raw_count, # Stage 6b
             bam_file,formatter(),
             '{path[0]}/*count.csv',
@@ -875,10 +900,11 @@ class full_tm_pipeline:
             """
             Create a fastQC report in the ouptut directory
             """
-            cmd ="fastqc %s -o %s --threads %d --quiet; rm %s/*.zip" %(input_file,
-                                                                      subdir_1, 
-                                                                      self.args.threads,
-                                                                      subdir_1)
+            cmd = "fastqc %s -o %s --threads %d --quiet; rm %s/*.zip" % \
+                (input_file,
+                subdir_1, 
+                self.args.threads,
+                subdir_1)
             with logging_mutex:
                 logger.info("Create a fastqc report of raw %(input_file)s" % locals())
                 logger.debug("view_raw_data: cmdline\n"+cmd)
@@ -889,19 +915,20 @@ class full_tm_pipeline:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
         # Create the second output: a fastqc report of processed DATA
-        subdir_2 = os.path.join(self.args.output_dir,"FastQC_processed")
+        subdir_2 = os.path.join(self.args.output_dir, "FastQC_processed")
         # clean the dir (of previous run output)
         try:
             shutil.rmtree(subdir_2)
         except OSError:
             pass          
+
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         @follows(bam2normalized_cov)
         @mkdir(subdir_2)
         @transform(trimmomatic, formatter(),
                         # move to output directory
                         os.path.join(subdir_2,"{basename[0]}"+"_fastqc.zip"),
                         self.logger, self.logging_mutex)
-           
         def view_processed_data (input_file, soft_link_name, logger, logging_mutex):
             """
             Create a fastQC report in the ouptut directory
@@ -927,6 +954,8 @@ class full_tm_pipeline:
             shutil.rmtree(subdir_3)
         except OSError:
             pass        
+
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         @follows(bam2normalized_cov)
         @mkdir(subdir_3)
         @transform(self.args.working_dir+'/*.log', 
@@ -943,13 +972,13 @@ class full_tm_pipeline:
                 logger.info("Save log files: %(input_files)s" % locals())
                 logger.debug("save_log: cmdline\n"+cmd)                
             extern.run(cmd)      
-     
-     
-        subdir_4 = os.path.join(self.args.output_dir,"reads_distribution") 
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        subdir_4 = os.path.join(self.args.output_dir, "reads_distribution") 
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         @mkdir(subdir_4)
         @collate(save_log, formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
                  subdir_4+"/{BASE[0]}_reads_stat",'{BASE[0]}')
-        def logtable (input_files,output_file,basename):
+        def logtable(input_files, output_file, basename):
             """
             Sums up the count of reads which are kept after each step 
             """
@@ -996,8 +1025,8 @@ class full_tm_pipeline:
                       map(str,stat.get_all_percentage_prev())])
                 numpy.savetxt(output_file,numpy.transpose(tab),delimiter='\t', fmt="%s") 
        
-
-        # RKR: # Stage T4b
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Stage T4b
 #        @merge(logtable, os.path.join(self.args.output_dir, 'summary_reads'), self.logger, self.logging_mutex)
         def concatenate_logtables(input_files, output_file, logger, logging_mutex):
             """
@@ -1012,7 +1041,6 @@ class full_tm_pipeline:
                 logger.debug("concatenate_logtables: cmdline\n"+cmd)                
             extern.run(cmd)  
 
-        # RKR:
         main_pl.merge(concatenate_logtables, # Stage T4b
             logtable, 
             os.path.join(self.args.output_dir, 'summary_reads'), 
@@ -1029,6 +1057,7 @@ class full_tm_pipeline:
             shutil.rmtree(subdir_4)
         except OSError:
             pass  
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         @mkdir(subdir_4)
         @transform(concat_for_mapping, formatter(),
                         # move to output directory

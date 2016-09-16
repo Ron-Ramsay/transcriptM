@@ -21,7 +21,8 @@
 # 22: Tidy-up." 
 # 23: Further tidy-up." 
 # 24: Try named parameters from transform(task_func = phiX_ID, ..." 
-print "25: Try named parameters from transform(task_func = phiX_extract, ... add_inputs ..."
+# 25: Try named parameters from transform(task_func = phiX_extract, ... add_inputs ..."
+print "26: Rename main_pl to rpl (ruffus pipeline)."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -236,7 +237,7 @@ class full_tm_pipeline:
             '''
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Decorated functions are automatically part of a default constructed Pipeline named "main".
-        main_pl = ruffus.Pipeline.pipelines["main"]
+        rpl = ruffus.Pipeline.pipelines["main"] # "rpl: 'Ruffus PipeLine'."
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_1
@@ -256,7 +257,7 @@ class full_tm_pipeline:
                 logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
             self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
         #RKR:
-#        main_pl\
+#        rpl\
 #            .originate(symlink_to_wd_metaT, self.alias_pe.keys(), self.logger, self.logging_mutex)\
 #            .follows(mkdir(self.args.working_dir))
             
@@ -341,7 +342,7 @@ class full_tm_pipeline:
                     name_sample, 'trimming', 'Trimmomatic', 'raw reads', 
                     str(processed_reads), stat.get_tot_percentage(processed_reads))
                   
-        main_pl.collate(trimmomatic, # Stage 2a
+        rpl.collate(trimmomatic, # Stage 2a
             symlink_to_wd_metaT,
             ruffus.regex("R[12].fq.gz$"),
             ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"],
@@ -373,7 +374,7 @@ class full_tm_pipeline:
                 logger.debug("phiX_map: cmdline\n"+ cmd)
             extern.run(cmd)
 
-        main_pl.subdivide(phiX_map, # Stage 3a
+        rpl.subdivide(phiX_map, # Stage 3a
             trimmomatic,
             ruffus.formatter(r"(.+)/(?P<BASE>.*)P1.fq.gz"),
             ["{path[0]}/phiX.{BASE[0]}P1.bam",
@@ -397,7 +398,7 @@ class full_tm_pipeline:
                 logger.debug("phiX_ID: cmdline\n" + cmd)
             extern.run(cmd)
 
-        main_pl.transform(
+        rpl.transform(
             task_func = phiX_ID, # Stage 3b # task_func
             input = phiX_map, # input = 
             filter = ruffus.suffix(".bam"), # filter = 
@@ -437,7 +438,7 @@ class full_tm_pipeline:
                 name_sample, 'PhiX removal', 'bamM make', 'processed reads',
                 str(non_phiX_reads), stat.get_tot_percentage(non_phiX_reads))
 
-        main_pl.collate(phiX_concat_ID, # Stage 3c
+        rpl.collate(phiX_concat_ID, # Stage 3c
             phiX_ID, 
             ruffus.formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),
             '{path[0]}/{BASE[0]}phiX_ID.log','{BASE[0]}',
@@ -449,7 +450,7 @@ class full_tm_pipeline:
         def QC_output(input_files, output_files):
             pass
 
-        main_pl.subdivide(QC_output, # Stage 3d
+        rpl.subdivide(QC_output, # Stage 3d
             trimmomatic,
             ruffus.regex(r"trimm_[UP][12].fq.gz"),
             ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"])
@@ -475,7 +476,7 @@ class full_tm_pipeline:
                     logger.debug("phiX_extract: cmdline\n"+ cmd)
                 extern.run(cmd) 
                 
-        main_pl.transform(task_func = phiX_extract, # Stage 3e
+        rpl.transform(task_func = phiX_extract, # Stage 3e
             input = QC_output,
             filter = ruffus.suffix(".fq.gz"), 
             add_inputs = ruffus.add_inputs(phiX_concat_ID), 
@@ -506,13 +507,13 @@ class full_tm_pipeline:
                 logger.debug("sortmerna: cmdline\n"+ cmd)
             extern.run(cmd)
 
-        main_pl.subdivide(sortmerna, # Stage 4
+        rpl.subdivide(sortmerna, # Stage 4
             phiX_extract,
             ruffus.formatter(), 
             "{path[0]}/{basename[0]}_non_ncRNA.fq",
             "{path[0]}/{basename[0]}_ncRNA.fq",
             self.logger, self.logging_mutex)
-    
+            
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_5
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -567,7 +568,7 @@ class full_tm_pipeline:
                 name_sample, 'remove ncRNA', 'SortMeRNA', 'filtered reads (1st)', 
                 str(non_ncRNA_reads), stat.get_tot_percentage(non_ncRNA_reads))
 
-        main_pl.collate(concat_for_mapping, # Stage 5a
+        rpl.collate(concat_for_mapping, # Stage 5a
             sortmerna,
             ruffus.regex(r"trimm_.*"),
             ["concat_paired_R1.fq","concat_paired_R2.fq","concat_single.fq"],
@@ -633,7 +634,7 @@ class full_tm_pipeline:
                 str(mapped_reads), stat.get_tot_percentage(mapped_reads))
 
 # RKR:
-        main_pl.transform(map2ref, # Stage 5b
+        rpl.transform(map2ref, # Stage 5b
             concat_for_mapping, 
             ruffus.formatter(r"(.+)/(?P<BASE>.*)_concat_paired_R1.fq"),
             ruffus.add_inputs(symlink_to_wd_metaG),
@@ -680,7 +681,7 @@ class full_tm_pipeline:
                     name_sample, '.bam filter', 'BamM filter', 'mapped reads', 
                     str(mapped_reads_f), stat.get_tot_percentage(mapped_reads_f))
 
-        main_pl.transform(mapping_filter, # Stage 5c
+        rpl.transform(mapping_filter, # Stage 5c
             map2ref,ruffus.formatter('.bam'), 
             "{path[0]}/{basename[0]}_filtered.bam", 
             "{path[0]}/{basename[0]}_stringency_filter.log", 
@@ -735,7 +736,7 @@ class full_tm_pipeline:
                     logger.debug("bam2normalized_cov: cmdline\n"+ cmd1)
                 extern.run(cmd1)                
 
-        main_pl.subdivide(bam2normalized_cov, # Stage 6a
+        rpl.subdivide(bam2normalized_cov, # Stage 6a
             bam_file, 
             ruffus.formatter(),
             '{path[0]}/*normalized_cov.csv',
@@ -773,7 +774,7 @@ class full_tm_pipeline:
                     logger.debug("bam2raw_count: cmdline\n"+ cmd)                                       
                 extern.run(cmd)        
 
-        main_pl.subdivide(bam2raw_count, # Stage 6b
+        rpl.subdivide(bam2raw_count, # Stage 6b
             bam_file,ruffus.formatter(),
             '{path[0]}/*count.csv',
             self.list_gff,
@@ -1065,7 +1066,7 @@ class full_tm_pipeline:
                 logger.debug("concatenate_logtables: cmdline\n"+cmd)                
             extern.run(cmd)  
 
-        main_pl.merge(concatenate_logtables, # Stage T4b
+        rpl.merge(concatenate_logtables, # Stage T4b
             logtable, 
             os.path.join(self.args.output_dir, 'summary_reads'), 
             self.logger, self.logging_mutex)

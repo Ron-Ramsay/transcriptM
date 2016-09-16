@@ -24,7 +24,8 @@
 # 24: Try named parameters from transform(task_func = phiX_ID, ..." 
 # 25: Try named parameters from transform(task_func = phiX_extract, ... add_inputs ..."
 # 26: Rename main_pl to rpl (ruffus pipeline)."
-print "27: Reduced code width to 121 characters (visible in Github, half screen)."
+# 27: Reduced code width to 121 characters (visible in Github, half screen)."
+print "28: transform(save_processed_reads, # Stage T4c ... .follows(mkdir(subdir_4))."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -280,6 +281,7 @@ class full_tm_pipeline:
             with logging_mutex:
                 logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
             self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
+
         
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # check if bwa index are present 
@@ -807,7 +809,7 @@ class full_tm_pipeline:
         @merge(bam2normalized_cov, \
             os.path.join(self.args.output_dir,os.path.basename(self.args.output_dir)+'_NORM_COVERAGE.csv'), \
             self.logger, self.logging_mutex)
-        def transcriptM_table (input_files, output_file, logger, logging_mutex): 
+        def transcriptM_table (input_files, output_file, logger, logging_mutex): # Stage 7
             """
             Create one table that contains RPKM values for each gene of each bin for the different samples
             """
@@ -1110,15 +1112,15 @@ class full_tm_pipeline:
         except OSError:
             pass  
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        @mkdir(subdir_4)
-        @transform(concat_for_mapping, ruffus.formatter(),
-                        # move to output directory
-                        [os.path.join(subdir_4,"{basename[0]}{ext[0]}"),
-                        os.path.join(subdir_4,"{basename[1]}{ext[1]}"),
-                        os.path.join(subdir_4,"{basename[2]}{ext[2]}")],
-                        self.logger, self.logging_mutex)
-           
-        def save_processed_reads (input_file, output_file, logger, logging_mutex):
+        # Stage T4c
+#        @mkdir(subdir_4)
+#        @transform(concat_for_mapping, ruffus.formatter(),
+#                        # move to output directory
+#                        [os.path.join(subdir_4,"{basename[0]}{ext[0]}"),
+#                        os.path.join(subdir_4,"{basename[1]}{ext[1]}"),
+#                        os.path.join(subdir_4,"{basename[2]}{ext[2]}")],
+#                        self.logger, self.logging_mutex)
+        def save_processed_reads(input_file, output_file, logger, logging_mutex):
             """
             Copy the processed reads in the ouptut directory
             """
@@ -1129,6 +1131,15 @@ class full_tm_pipeline:
                     logger.info("Copy the processed reads %s in the ouptut directory" %(input_file[i]))
                     logger.debug("save_processed_reads: cmdline\n"+cmd)
                 extern.run(cmd)
+
+        rpl.transform(save_processed_reads, # Stage T4c
+                concat_for_mapping, ruffus.formatter(),
+                # move to output directory
+                [os.path.join(subdir_4,"{basename[0]}{ext[0]}"),
+                os.path.join(subdir_4,"{basename[1]}{ext[1]}"),
+                os.path.join(subdir_4,"{basename[2]}{ext[2]}")],
+                self.logger, self.logging_mutex)\
+            .follows(mkdir(subdir_4))
     
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: RUN

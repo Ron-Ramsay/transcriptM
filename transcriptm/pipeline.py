@@ -16,7 +16,8 @@
 # 17: enabled pipeline_flow_chart."
 # 18: Testing ruffus OO Stage 5b."
 # 19: Testing ruffus OO subdivide(bam2normalized_cov, # Stage 6a"
-print "#20: subdivide(sortmerna, # Stage 4; transform(map2ref, # Stage 5b; subdivide(bam2raw_count, # Stage 6b; merge(concatenate_logtables, # Stage T4b"
+# 20: subdivide(sortmerna, # Stage 4; transform(map2ref, # Stage 5b; subdivide(bam2raw_count, # Stage 6b; merge(concatenate_logtables, # Stage T4b"
+print "#21: collate(trimmomatic, # Stage 2a; subdivide(phiX_map, # Stage 3a; collate(concat_for_mapping, # Stage 5a"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -37,7 +38,7 @@ import extern        # version of Python's `subprocess`. See https://pypi.python
 import numpy         # array processing for numbers, strings, records, objects. See http://www.numpy.org/
 import ruffus        # light-weight computational pipeline management. See http://www.ruffus.org.uk
 #RKR: Remove theses once ruffus decorators are gone.
-from ruffus import collate, follows, merge, originate, subdivide, transform  # ruffus decorators.
+from ruffus import collate, follows, merge, originate, transform ### subdivide # ruffus decorators.
 from ruffus import suffix, regex, formatter, add_inputs                      # ruffus filter / indicators.
 from ruffus import active_if, mkdir                                          # ruffus other.
 
@@ -285,10 +286,12 @@ class full_tm_pipeline:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # First step in the QC process of the raw reads: trimming based on length and quality score     
 
-        @collate(symlink_to_wd_metaT,
-                 regex("R[12].fq.gz$"),
-                 ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"],"trimmomatic.log",
-                 self.logger, self.logging_mutex)
+        #RKR:
+        # Stage 2a
+#        @collate(symlink_to_wd_metaT,
+#                 regex("R[12].fq.gz$"),
+#                 ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"],"trimmomatic.log",
+#                 self.logger, self.logging_mutex)
         def trimmomatic(input_files, output_file,log,logger, logging_mutex):
             """
             Trimmomatic. Trim and remove adapters of paired reads
@@ -327,13 +330,21 @@ class full_tm_pipeline:
             processed_reads = stat.count_processed_reads(log)
             self.op_progress(name_sample,'trimming','Trimmomatic','raw reads',str(processed_reads),stat.get_tot_percentage(processed_reads))
                   
+        main_pl.collate(trimmomatic, # Stage 2a
+            symlink_to_wd_metaT,
+            regex("R[12].fq.gz$"),
+            ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"],
+            "trimmomatic.log",
+            self.logger, self.logging_mutex)
+
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_3
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Second step in the QC process: remove phiX contamination
-        @subdivide(trimmomatic,formatter(r"(.+)/(?P<BASE>.*)P1.fq.gz"),["{path[0]}/phiX.{BASE[0]}P1.bam",
-                                                                        "{path[0]}/phiX.{BASE[0]}U1.bam",
-                                                                        "{path[0]}/phiX.{BASE[0]}U2.bam"], self.logger, self.logging_mutex)
+        # Stage 3a
+#        @subdivide(trimmomatic,formatter(r"(.+)/(?P<BASE>.*)P1.fq.gz"),["{path[0]}/phiX.{BASE[0]}P1.bam",
+#                                                                        "{path[0]}/phiX.{BASE[0]}U1.bam",
+#                                                                        "{path[0]}/phiX.{BASE[0]}U2.bam"], self.logger, self.logging_mutex)
         def phiX_map (input_files, output_files, logger, logging_mutex):
             """
             BamM make. Map all reads against PhiX genome
@@ -349,7 +360,15 @@ class full_tm_pipeline:
                 logger.info("Map reads [%s] against phiX genome"%(','.join(input_files)))
                 logger.debug("phiX_map: cmdline\n"+ cmd)
             extern.run(cmd)
-        ###
+
+        main_pl.subdivide(phiX_map, # Stage 3a
+            trimmomatic,
+            formatter(r"(.+)/(?P<BASE>.*)P1.fq.gz"),
+            ["{path[0]}/phiX.{BASE[0]}P1.bam",
+             "{path[0]}/phiX.{BASE[0]}U1.bam",
+             "{path[0]}/phiX.{BASE[0]}U2.bam"], 
+            self.logger, self.logging_mutex)
+
         #RKR:
         #@transform(phiX_map, suffix(".bam"), ".txt", self.logger, self.logging_mutex)
         ###
@@ -366,7 +385,9 @@ class full_tm_pipeline:
         main_pl.transform(phiX_ID, phiX_map, suffix(".bam"), ".txt", self.logger, self.logging_mutex)
         ###
                 
-        @collate(phiX_ID,formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),'{path[0]}/{BASE[0]}phiX_ID.log','{BASE[0]}',self.logger, self.logging_mutex)
+        #RKR:
+        # Stage 3c
+#        @collate(phiX_ID,formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),'{path[0]}/{BASE[0]}phiX_ID.log','{BASE[0]}',self.logger, self.logging_mutex)
         def phiX_concat_ID(input_files, output_file,basename,logger, logging_mutex):
             """
             Concatenate all PhiX ID found previously
@@ -390,10 +411,23 @@ class full_tm_pipeline:
             non_phiX_reads = processed_reads - phiX_reads
             self.op_progress(name_sample,'PhiX removal','bamM make','processed reads',str(non_phiX_reads),stat.get_tot_percentage(non_phiX_reads))
 
-        @subdivide(trimmomatic,regex(r"trimm_[UP][12].fq.gz"),["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"])
-        def QC_output(input_files,output_files):
-            pass
+        main_pl.collate(phiX_concat_ID, # Stage 3c
+            phiX_ID, 
+            formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),
+            '{path[0]}/{BASE[0]}phiX_ID.log','{BASE[0]}',
+            self.logger, self.logging_mutex)
         
+        #RKR:
+        # Stage 3d
+        #@subdivide(trimmomatic,regex(r"trimm_[UP][12].fq.gz"),["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"])
+        def QC_output(input_files, output_files):
+            pass
+
+        main_pl.subdivide(QC_output, # Stage 3d
+            trimmomatic,
+            regex(r"trimm_[UP][12].fq.gz"),
+            ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"])
+
         ###RKR
         #@transform(QC_output,suffix(".fq.gz"),add_inputs(phiX_concat_ID),"_phiX_ext.fq",self.logger, self.logging_mutex)
         def phiX_extract(input_files, output_files,logger, logging_mutex):
@@ -495,8 +529,7 @@ class full_tm_pipeline:
             non_ncRNA_reads = stat.count_seq_fq(output_files[0])+stat.count_seq_fq(output_files[2])
             self.op_progress(name_sample, 'remove ncRNA', 'SortMeRNA', 'filtered reads (1st)', str(non_ncRNA_reads), stat.get_tot_percentage(non_ncRNA_reads))
 
-        main_pl.collate(
-            concat_for_mapping, # Stage 5a
+        main_pl.collate(concat_for_mapping, # Stage 5a
             sortmerna,
             regex(r"trimm_.*"),
             ["concat_paired_R1.fq","concat_paired_R2.fq","concat_single.fq"],

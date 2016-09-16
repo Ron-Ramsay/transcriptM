@@ -18,7 +18,8 @@
 # 19: Testing ruffus OO subdivide(bam2normalized_cov, # Stage 6a"
 # 20: subdivide(sortmerna, # Stage 4; transform(map2ref, # Stage 5b; subdivide(bam2raw_count, # Stage 6b; merge(concatenate_logtables, # Stage T4b"
 # 21: collate(trimmomatic, # Stage 2a; subdivide(phiX_map, # Stage 3a; collate(concat_for_mapping, # Stage 5a"
-print "22: Tidy-up."
+# 22: Tidy-up." 
+print "23: Further tidy-up." 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -40,7 +41,7 @@ import numpy         # array processing for numbers, strings, records, objects. 
 import ruffus        # light-weight computational pipeline management. See http://www.ruffus.org.uk
 #RKR: Remove theses once ruffus decorators are gone.
 from ruffus import collate, follows, merge, originate, transform ### subdivide # ruffus decorators.
-from ruffus import regex, formatter, add_inputs ### , suffix                 # ruffus filter / indicators.
+# from ruffus import regex, formatter, add_inputs, suffix                 # ruffus filter / indicators.
 from ruffus import active_if, mkdir                                          # ruffus other.
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -127,7 +128,8 @@ class full_tm_pipeline:
             self.tot_pe = {}
             for i in range(int(len(self.args.paired_end)/2)):
                 ###! ACCURACY?: Is dividing the number of lines in the file by for completely accurate? e.g. Could the file have comment lines? 
-                count = int(subprocess.check_output("zcat %s | wc -l " %(self.args.paired_end[2*i]), shell=True).split(' ')[0])/4 
+                count = int(subprocess.check_output("zcat %s | wc -l " % \
+                                                (self.args.paired_end[2*i]), shell=True).split(' ')[0])/4 
                 self.tot_pe[self.prefix_pe['sample-'+str(i)]]=count
                 self.op_progress(self.prefix_pe['sample-'+str(i)], 'raw data', 'FastQC-check', 'raw reads', str(count), '100.00 %')
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -258,7 +260,7 @@ class full_tm_pipeline:
             
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         @mkdir(self.args.working_dir)
-        @transform(self.args.metaG_contigs, formatter(),
+        @transform(self.args.metaG_contigs, ruffus.formatter(),
                         # move to working directory
                         os.path.join(self.args.working_dir,"{basename[0]}"+".fa"),
                         self.logger, self.logging_mutex)
@@ -274,7 +276,7 @@ class full_tm_pipeline:
         # check if bwa index are present 
         @active_if(self.has_index(self.args.metaG_contigs,['.amb','.bwt','.ann','.pac','.sa']))
         @mkdir(self.args.working_dir)
-        @transform([self.args.metaG_contigs+x for x in ['.amb','.bwt','.ann','.pac','.sa'] ], formatter(),
+        @transform([self.args.metaG_contigs+x for x in ['.amb','.bwt','.ann','.pac','.sa'] ], ruffus.formatter(),
                         # move to working directory
                         os.path.join(self.args.working_dir,"{basename[0]}{ext[0]}"),
                         self.logger, self.logging_mutex)
@@ -333,11 +335,13 @@ class full_tm_pipeline:
             stat = Monitoring(self.tot_pe[name_sample])
             ## processed reads
             processed_reads = stat.count_processed_reads(log)
-            self.op_progress(name_sample,'trimming','Trimmomatic','raw reads',str(processed_reads),stat.get_tot_percentage(processed_reads))
+            self.op_progress(
+                    name_sample, 'trimming', 'Trimmomatic', 'raw reads', 
+                    str(processed_reads), stat.get_tot_percentage(processed_reads))
                   
         main_pl.collate(trimmomatic, # Stage 2a
             symlink_to_wd_metaT,
-            regex("R[12].fq.gz$"),
+            ruffus.regex("R[12].fq.gz$"),
             ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"],
             "trimmomatic.log",
             self.logger, self.logging_mutex)
@@ -354,13 +358,14 @@ class full_tm_pipeline:
             """
             BamM make. Map all reads against PhiX genome
             """
-            cmd = "bamm make -d %s -c %s %s -s %s %s -o %s --threads %d -K --quiet" %(self.ref_genome_phiX,
-                                                                                 input_files[0],
-                                                                                 input_files[1],
-                                                                                 input_files[2],
-                                                                                 input_files[3],
-                                                                                 self.args.working_dir,
-                                                                                 self.args.threads)
+            cmd = "bamm make -d %s -c %s %s -s %s %s -o %s --threads %d -K --quiet" %( \
+                    self.ref_genome_phiX,
+                    input_files[0],
+                    input_files[1],
+                    input_files[2],
+                    input_files[3],
+                    self.args.working_dir,
+                    self.args.threads)
             with logging_mutex:
                 logger.info("Map reads [%s] against phiX genome"%(','.join(input_files)))
                 logger.debug("phiX_map: cmdline\n"+ cmd)
@@ -368,7 +373,7 @@ class full_tm_pipeline:
 
         main_pl.subdivide(phiX_map, # Stage 3a
             trimmomatic,
-            formatter(r"(.+)/(?P<BASE>.*)P1.fq.gz"),
+            ruffus.formatter(r"(.+)/(?P<BASE>.*)P1.fq.gz"),
             ["{path[0]}/phiX.{BASE[0]}P1.bam",
              "{path[0]}/phiX.{BASE[0]}U1.bam",
              "{path[0]}/phiX.{BASE[0]}U2.bam"], 
@@ -414,15 +419,18 @@ class full_tm_pipeline:
             name_sample = self.prefix_pe[os.path.basename(output_file).split('_trimm_phiX_ID.log')[0]]            
             stat= Monitoring(self.tot_pe[name_sample])
             ## non phiX reads
-            trimm_file = os.path.join(self.args.working_dir,[f for f in os.listdir(self.args.working_dir) if re.search(r'%s.*trimmomatic.log'%(basename.split('_')[0]), f)][0])     
+            trimm_file = os.path.join(self.args.working_dir,
+                  [f for f in os.listdir(self.args.working_dir) if re.search(r'%s.*trimmomatic.log'%(basename.split('_')[0]), f)][0])     
             processed_reads = stat.count_processed_reads(trimm_file)
             phiX_reads = int(subprocess.check_output("wc -l "+output_file, shell=True).split(' ')[0])
             non_phiX_reads = processed_reads - phiX_reads
-            self.op_progress(name_sample,'PhiX removal','bamM make','processed reads',str(non_phiX_reads),stat.get_tot_percentage(non_phiX_reads))
+            self.op_progress(
+                name_sample, 'PhiX removal', 'bamM make', 'processed reads',
+                str(non_phiX_reads), stat.get_tot_percentage(non_phiX_reads))
 
         main_pl.collate(phiX_concat_ID, # Stage 3c
             phiX_ID, 
-            formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),
+            ruffus.formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),
             '{path[0]}/{BASE[0]}phiX_ID.log','{BASE[0]}',
             self.logger, self.logging_mutex)
         
@@ -434,7 +442,7 @@ class full_tm_pipeline:
 
         main_pl.subdivide(QC_output, # Stage 3d
             trimmomatic,
-            regex(r"trimm_[UP][12].fq.gz"),
+            ruffus.regex(r"trimm_[UP][12].fq.gz"),
             ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"])
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -461,7 +469,7 @@ class full_tm_pipeline:
         main_pl.transform(phiX_extract, # Stage 3e
             QC_output,
             ruffus.suffix(".fq.gz"), 
-            add_inputs(phiX_concat_ID), 
+            ruffus.add_inputs(phiX_concat_ID), 
             "_phiX_ext.fq", 
             self.logger, self.logging_mutex)
 
@@ -478,11 +486,12 @@ class full_tm_pipeline:
             """
             SortMeRNA. Remove non-coding RNA
             """
-            cmd= "sortmerna --ref %s --reads %s --aligned %s --other %s --fastx -a %d --log" %(self.args.path_db_smr,
-                                                                                               input_files,
-                                                                                               ncRNA_files.split('.fq')[0],
-                                                                                               output_files.split('.fq')[0],
-                                                                                               self.args.threads)
+            cmd = "sortmerna --ref %s --reads %s --aligned %s --other %s --fastx -a %d --log" %( \
+                    self.args.path_db_smr,
+                    input_files,
+                    ncRNA_files.split('.fq')[0],
+                    output_files.split('.fq')[0],
+                    self.args.threads)
             with logging_mutex:
                 logger.info("Remove reads with SortMeRNA in %(input_files)s"%locals())
                 logger.debug("sortmerna: cmdline\n"+ cmd)
@@ -490,7 +499,7 @@ class full_tm_pipeline:
 
         main_pl.subdivide(sortmerna, # Stage 4
             phiX_extract,
-            formatter(), 
+            ruffus.formatter(), 
             "{path[0]}/{basename[0]}_non_ncRNA.fq",
             "{path[0]}/{basename[0]}_ncRNA.fq",
             self.logger, self.logging_mutex)
@@ -545,11 +554,13 @@ class full_tm_pipeline:
             stat= Monitoring(self.tot_pe[name_sample])
             ## non ncRNA reads
             non_ncRNA_reads = stat.count_seq_fq(output_files[0])+stat.count_seq_fq(output_files[2])
-            self.op_progress(name_sample, 'remove ncRNA', 'SortMeRNA', 'filtered reads (1st)', str(non_ncRNA_reads), stat.get_tot_percentage(non_ncRNA_reads))
+            self.op_progress(
+                name_sample, 'remove ncRNA', 'SortMeRNA', 'filtered reads (1st)', 
+                str(non_ncRNA_reads), stat.get_tot_percentage(non_ncRNA_reads))
 
         main_pl.collate(concat_for_mapping, # Stage 5a
             sortmerna,
-            regex(r"trimm_.*"),
+            ruffus.regex(r"trimm_.*"),
             ["concat_paired_R1.fq","concat_paired_R2.fq","concat_single.fq"],
             "ID_single.txt", 
             self.logger, self.logging_mutex)
@@ -608,13 +619,15 @@ class full_tm_pipeline:
             stat= Monitoring(self.tot_pe[name_sample])
             ## reads filtered : mapped with high stringency
             mapped_reads = stat.count_mapping_reads(flagstat,True)
-            self.op_progress(name_sample, 'alignment', 'BamM make', 'filtered reads (2nd)', str(mapped_reads), stat.get_tot_percentage(mapped_reads))
+            self.op_progress(
+                name_sample, 'alignment', 'BamM make', 'filtered reads (2nd)', 
+                str(mapped_reads), stat.get_tot_percentage(mapped_reads))
 
 # RKR:
         main_pl.transform(map2ref, # Stage 5b
             concat_for_mapping, 
-            formatter(r"(.+)/(?P<BASE>.*)_concat_paired_R1.fq"),
-            add_inputs(symlink_to_wd_metaG),
+            ruffus.formatter(r"(.+)/(?P<BASE>.*)_concat_paired_R1.fq"),
+            ruffus.add_inputs(symlink_to_wd_metaG),
             "{path[0]}/{BASE[0]}.bam",
             ["{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[0]}.bam",
              "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[2]}.bam",
@@ -654,10 +667,12 @@ class full_tm_pipeline:
                 stat= Monitoring(self.tot_pe[name_sample])
                 ## reads filtered : mapped with high stringency
                 mapped_reads_f = stat.count_mapping_reads(flagstat,False)
-                self.op_progress(name_sample, '.bam filter', 'BamM filter', 'mapped reads', str(mapped_reads_f), stat.get_tot_percentage(mapped_reads_f))
+                self.op_progress(
+                    name_sample, '.bam filter', 'BamM filter', 'mapped reads', 
+                    str(mapped_reads_f), stat.get_tot_percentage(mapped_reads_f))
 
         main_pl.transform(mapping_filter, # Stage 5c
-            map2ref,formatter('.bam'), 
+            map2ref,ruffus.formatter('.bam'), 
             "{path[0]}/{basename[0]}_filtered.bam", 
             "{path[0]}/{basename[0]}_stringency_filter.log", 
             self.logger, self.logging_mutex)
@@ -713,7 +728,7 @@ class full_tm_pipeline:
 
         main_pl.subdivide(bam2normalized_cov, # Stage 6a
             bam_file, 
-            formatter(),
+            ruffus.formatter(),
             '{path[0]}/*normalized_cov.csv',
             '{path[0]}/coverage.csv',
             self.args.dir_bins,
@@ -750,7 +765,7 @@ class full_tm_pipeline:
                 extern.run(cmd)        
 
         main_pl.subdivide(bam2raw_count, # Stage 6b
-            bam_file,formatter(),
+            bam_file,ruffus.formatter(),
             '{path[0]}/*count.csv',
             self.list_gff,
             self.logger, self.logging_mutex)
@@ -892,7 +907,7 @@ class full_tm_pipeline:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         @follows(bam2normalized_cov)
         @mkdir(subdir_1)
-        @transform(symlink_to_wd_metaT, formatter(),
+        @transform(symlink_to_wd_metaT, ruffus.formatter(),
                         # move to output directory
                         os.path.join(subdir_1,"{basename[0]}"+"_fastqc.zip"),
                         self.logger, self.logging_mutex)
@@ -925,7 +940,7 @@ class full_tm_pipeline:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         @follows(bam2normalized_cov)
         @mkdir(subdir_2)
-        @transform(trimmomatic, formatter(),
+        @transform(trimmomatic, ruffus.formatter(),
                         # move to output directory
                         os.path.join(subdir_2,"{basename[0]}"+"_fastqc.zip"),
                         self.logger, self.logging_mutex)
@@ -959,7 +974,7 @@ class full_tm_pipeline:
         @follows(bam2normalized_cov)
         @mkdir(subdir_3)
         @transform(self.args.working_dir+'/*.log', 
-                   formatter(".log"),  
+                   ruffus.formatter(".log"),  
                    os.path.join(subdir_3,
                    "{basename[0]}"+".log"),
                    self.logger, self.logging_mutex)
@@ -976,7 +991,7 @@ class full_tm_pipeline:
         subdir_4 = os.path.join(self.args.output_dir, "reads_distribution") 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         @mkdir(subdir_4)
-        @collate(save_log, formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
+        @collate(save_log, ruffus.formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
                  subdir_4+"/{BASE[0]}_reads_stat",'{BASE[0]}')
         def logtable(input_files, output_file, basename):
             """
@@ -1059,7 +1074,7 @@ class full_tm_pipeline:
             pass  
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         @mkdir(subdir_4)
-        @transform(concat_for_mapping, formatter(),
+        @transform(concat_for_mapping, ruffus.formatter(),
                         # move to output directory
                         [os.path.join(subdir_4,"{basename[0]}{ext[0]}"),
                         os.path.join(subdir_4,"{basename[1]}{ext[1]}"),

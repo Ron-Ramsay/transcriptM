@@ -13,7 +13,8 @@
 # 14: rewrite function clear."
 # 15: ruffus objects."
 # 16: Removed mode variable." 
-print "# 17: enabled pipeline_flow_chart."
+# 17: enabled pipeline_flow_chart."
+print "# 18: Testing ruffus OO Stage 5b."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -53,7 +54,7 @@ class full_tm_pipeline:
         """
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def __init__(self, args):
-        """ routines automatically executed upon instantiation of an instance of this class. 
+        """ (routines automatically executed upon instantiation of an instance of this class).
             """
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def presto_ref_genome_phiX():
@@ -136,13 +137,17 @@ class full_tm_pipeline:
                 """       
             self.logger, self.logging_mutex = ruffus.cmdline.setup_logging(__name__, args.log_file, args.verbose)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        self.args = args             # Store arguments passed.
-        presto_ref_genome_phiX()     # Generate and validate derived argments...
-        presto_list_gff()            # ...
-        presto_alias_pe()            # ...
-        presto_prefix_pe()           # ...
-        presto_tot_pe()              # ...
-        setup_logging()              # Set up logging.
+        ''' function control: '''
+        # Store arguments passed.
+        self.args = args             
+        # Generate and validate derived argments...
+        presto_ref_genome_phiX()
+        presto_list_gff()
+        presto_alias_pe()
+        presto_prefix_pe()
+        presto_tot_pe()
+        # Set up logging.
+        setup_logging()              
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -212,17 +217,17 @@ class full_tm_pipeline:
         return S1[x_longest-longest: x_longest]
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def op_progress(self, name_sample, p2, p3, p4, p5, p6):
-        ''' prints out the provided parameters as a line formated in standard column widths.
+        """ prints out the provided parameters as a line formated in standard column widths.
             This function probably belongs in module Monitoring, but is put here until that is sorted out.
-            '''
+            """
         print "{0:20} {1:16} {2:16} {3:20} {4:>12}  {5:>8}".format(name_sample, p2, p3, p4, p5, p6)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Pipeline Stages
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def pipeline_stages(self):
-        """ defines all the pipelined functions and runs them.
-            """
+        ''' defines all the pipelined functions and runs them.
+            '''
         # Decorated functions are automatically part of a default constructed Pipeline named "main".
         main_pipeline = ruffus.Pipeline.pipelines["main"]
 
@@ -231,23 +236,28 @@ class full_tm_pipeline:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Create symbolic link of inputs files in the working directory
         
+        #RKR
         @mkdir(self.args.working_dir)
         @originate(self.alias_pe.keys(), self.logger, self.logging_mutex)
-        def symlink_to_wd_metaT (soft_link_name, logger, logging_mutex):
+        def symlink_to_wd_metaT (soft_link_name, logger, logging_mutex): # Stage 1a)
             """
             Make soft link in working directory
             """
-            input_file= self.alias_pe[soft_link_name]
+            input_file = self.alias_pe[soft_link_name]
             with logging_mutex:
                 logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
             self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
+        #RKR:
+#        main_pipeline\
+#            .originate(symlink_to_wd_metaT, self.alias_pe.keys(), self.logger, self.logging_mutex)\
+#            .follows(mkdir(self.args.working_dir))
             
         @mkdir(self.args.working_dir)
         @transform(self.args.metaG_contigs, formatter(),
                         # move to working directory
                         os.path.join(self.args.working_dir,"{basename[0]}"+".fa"),
                         self.logger, self.logging_mutex)
-        def symlink_to_wd_metaG (input_file, soft_link_name, logger, logging_mutex):
+        def symlink_to_wd_metaG (input_file, soft_link_name, logger, logging_mutex): # Stage 1b)
             """
             Make soft link in working directory
             """
@@ -262,7 +272,7 @@ class full_tm_pipeline:
                         # move to working directory
                         os.path.join(self.args.working_dir,"{basename[0]}{ext[0]}"),
                         self.logger, self.logging_mutex)
-        def symlink_to_wd_metaG_index (input_file, soft_link_name, logger, logging_mutex):
+        def symlink_to_wd_metaG_index (input_file, soft_link_name, logger, logging_mutex): # Stage 1c)
             """
             Make soft link in working directory
             """
@@ -480,12 +490,15 @@ class full_tm_pipeline:
         # WARNINGS
         #1. .bam files generated with 'BamM' only contain the mapped reads -> be carful with the interpretation of samtools flagstat
         #2. only one alignment per read is kept: the secondary and supplementary are removed
-        @transform(concat_for_mapping,formatter(r"(.+)/(?P<BASE>.*)_concat_paired_R1.fq"),
-                   add_inputs(symlink_to_wd_metaG),"{path[0]}/{BASE[0]}.bam",
-                   ["{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[0]}.bam",
-                    "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[2]}.bam",
-                    "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+"{BASE[0]}_merged.bam"],
-                    "{path[0]}/{BASE[0]}_mapping.log",self.logger, self.logging_mutex)
+
+        # Stage 5b)        
+# RKR:
+#        @transform(concat_for_mapping,formatter(r"(.+)/(?P<BASE>.*)_concat_paired_R1.fq"),
+#                   add_inputs(symlink_to_wd_metaG),"{path[0]}/{BASE[0]}.bam",
+#                   ["{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[0]}.bam",
+#                    "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[2]}.bam",
+#                    "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+"{BASE[0]}_merged.bam"],
+#                    "{path[0]}/{BASE[0]}_mapping.log",self.logger, self.logging_mutex)
         def map2ref (input_files, output_file, bams,flagstat,logger,logging_mutex):
             """
             BamM make. Map all metatranscriptomics reads against metagenomics contigs
@@ -526,6 +539,19 @@ class full_tm_pipeline:
             ## reads filtered : mapped with high stringency
             mapped_reads = stat.count_mapping_reads(flagstat,True)
             self.op_progress(name_sample, 'alignment', 'BamM make', 'filtered reads (2nd)', str(mapped_reads), stat.get_tot_percentage(mapped_reads))
+
+# RKR:
+        main_pipeline.transform(
+            map2ref, # Stage 5b)
+            concat_for_mapping, 
+            formatter(r"(.+)/(?P<BASE>.*)_concat_paired_R1.fq"),
+            add_inputs(symlink_to_wd_metaG),
+            "{path[0]}/{BASE[0]}.bam",
+            ["{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[0]}.bam",
+             "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[2]}.bam",
+             "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+"{BASE[0]}_merged.bam"],
+            "{path[0]}/{BASE[0]}_mapping.log",
+            self.logger, self.logging_mutex)
 
         ###RKR
         #@transform(map2ref,formatter('.bam'),"{path[0]}/{basename[0]}_filtered.bam", 

@@ -19,7 +19,8 @@
 # 20: subdivide(sortmerna, # Stage 4; transform(map2ref, # Stage 5b; subdivide(bam2raw_count, # Stage 6b; merge(concatenate_logtables, # Stage T4b"
 # 21: collate(trimmomatic, # Stage 2a; subdivide(phiX_map, # Stage 3a; collate(concat_for_mapping, # Stage 5a"
 # 22: Tidy-up." 
-print "23: Further tidy-up." 
+# 23: Further tidy-up." 
+print "24: Try named parameters from transform(task_func = phiX_ID, ..." 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -381,24 +382,31 @@ class full_tm_pipeline:
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         #RKR:
+        # Stage 3b
         #@transform(phiX_map, suffix(".bam"), ".txt", self.logger, self.logging_mutex)
         ###
         def phiX_ID(input_files, output_files, logger, logging_mutex):
             """
             Samtools. Get the IDs of PhiX reads
             """
-            cmd ="samtools view -F4 %s | awk {'print $1'} > %s "%(input_files,output_files)
+            cmd = "samtools view -F4 %s | awk {'print $1'} > %s "%(input_files, output_files)
+            
             with logging_mutex:
                 logger.info("Extract ID of phiX reads in %s" %(input_files))
-                logger.debug("phiX_ID: cmdline\n"+ cmd)
+                logger.debug("phiX_ID: cmdline\n" + cmd)
             extern.run(cmd)
 
-        main_pl.transform(phiX_ID, 
-            phiX_map, 
-            ruffus.suffix(".bam"), 
-            ".txt", 
-            self.logger, self.logging_mutex)
-                
+        main_pl.transform(
+            task_func = phiX_ID, # Stage 3b # task_func
+            input = phiX_map, # input = 
+            filter = ruffus.suffix(".bam"), # filter = 
+            output = ".txt", # output = ?
+            extras = [
+                self.logger, # logging 
+                self.logging_mutex
+                ]
+            )
+
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 3c
 #        @collate(phiX_ID,formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),'{path[0]}/{BASE[0]}phiX_ID.log','{BASE[0]}',self.logger, self.logging_mutex)

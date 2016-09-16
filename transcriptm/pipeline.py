@@ -14,7 +14,8 @@
 # 15: ruffus objects."
 # 16: Removed mode variable." 
 # 17: enabled pipeline_flow_chart."
-print "# 18: Testing ruffus OO Stage 5b."
+# "18: Testing ruffus OO Stage 5b."
+print "# 19: Testing ruffus OO subdivide(bam2normalized_cov, # Stage 6a"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -509,19 +510,21 @@ class full_tm_pipeline:
             else:
                 # index doesn't exist yet -> bamm keep        
                 index_exists='k'
-            cmd ="bamm make -d %s -c %s %s -s %s -o %s --threads %d -%s --quiet" %(input_files[1],
-                                                                            input_files[0][0],
-                                                                            input_files[0][1],
-                                                                            input_files[0][2],
-                                                                            self.args.working_dir,
-                                                                            self.args.threads,
-                                                                            index_exists) 
+            cmd = "bamm make -d %s -c %s %s -s %s -o %s --threads %d -%s --quiet" % \
+                    (input_files[1],
+                    input_files[0][0],
+                    input_files[0][1],
+                    input_files[0][2],
+                    self.args.working_dir,
+                    self.args.threads,
+                    index_exists) 
             with logging_mutex:     
-                logger.info("Map reads [%s] to the reference metagenome %s"%(",".join(input_files[0]),input_files[1]))
+                logger.info("Map reads [%s] to the reference metagenome %s"%(",".join(input_files[0]), input_files[1]))
                 logger.debug("map2ref: cmdline\n"+ cmd)  
             extern.run(cmd)
             
-            cmd2= "samtools merge -f %s %s %s ; samtools view -b -F2304 %s > %s " %(bams[2],bams[0],bams[1],bams[2],output_file)
+            cmd2 = "samtools merge -f %s %s %s ; samtools view -b -F2304 %s > %s " % \
+                    (bams[2], bams[0], bams[1], bams[2], output_file)
             with logging_mutex:     
                 logger.info("Concatenate %s and %s"%(bams[0],bams[1]))
                 logger.debug("map2ref: cmdline\n"+ cmd2)  
@@ -542,7 +545,7 @@ class full_tm_pipeline:
 
 # RKR:
         main_pipeline.transform(
-            map2ref, # Stage 5b)
+            map2ref, # Stage 5b
             concat_for_mapping, 
             formatter(r"(.+)/(?P<BASE>.*)_concat_paired_R1.fq"),
             add_inputs(symlink_to_wd_metaG),
@@ -596,7 +599,9 @@ class full_tm_pipeline:
             bam_file = map2ref 
         else: 
             bam_file= mapping_filter
-        @subdivide(bam_file,formatter(),'{path[0]}/*normalized_cov.csv','{path[0]}/coverage.csv' ,self.args.dir_bins,self.logger, self.logging_mutex)
+
+        # RKR:
+#        @subdivide(bam_file,formatter(),'{path[0]}/*normalized_cov.csv','{path[0]}/coverage.csv' ,self.args.dir_bins,self.logger, self.logging_mutex)
         def bam2normalized_cov(input_file, output_file,coverage_file, dir_bins,logger, logging_mutex):
             """
             Dirseq (compute coverage values) +  coverage2normalized_cov
@@ -630,6 +635,16 @@ class full_tm_pipeline:
                     logger.info("Convert coverage to normalized_cov")
                     logger.debug("bam2normalized_cov: cmdline\n"+ cmd1)
                 extern.run(cmd1)                
+
+        # RKR:
+        main_pipeline.subdivide(
+            bam2normalized_cov, # Stage 6a
+            bam_file, 
+            formatter(),
+            '{path[0]}/*normalized_cov.csv',
+            '{path[0]}/coverage.csv',
+            self.args.dir_bins,
+            self.logger, self.logging_mutex)
         
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_6 BIS (raw count)
@@ -713,7 +728,7 @@ class full_tm_pipeline:
                         csvfile.close() 
          
             tab = numpy.array(normalized_cov_col)
-            numpy.savetxt(output_file,numpy.transpose(tab),delimiter='\t', fmt="%s") 
+            numpy.savetxt(output_file, numpy.transpose(tab), delimiter='\t', fmt="%s") 
             
             with logging_mutex:     
                 logger.info("Create table that contains normalized_cov values for each gene of each bin given as input for the different samples: %s"%(','.join(self.prefix_pe.values())))    
@@ -724,7 +739,9 @@ class full_tm_pipeline:
 
         # Concatenate all the raw count in a table
         @mkdir(self.args.output_dir)
-        @merge(bam2raw_count,os.path.join(self.args.output_dir,os.path.basename(self.args.output_dir)+'_COUNT.csv'),self.logger, self.logging_mutex)
+        @merge(bam2raw_count,
+            os.path.join(self.args.output_dir,os.path.basename(self.args.output_dir)+'_COUNT.csv'),
+            self.logger, self.logging_mutex)
         def raw_count_table (input_files, output_file, logger, logging_mutex): 
             """
             Create one table that contains raw count values for each gene of each bin for the different samples
@@ -846,7 +863,7 @@ class full_tm_pipeline:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # get monitoring data
         
-        subdir_3= os.path.join(self.args.output_dir,"log/")
+        subdir_3 = os.path.join(self.args.output_dir,"log/")
         # clean the dir (of previous run output)
         try:
             shutil.rmtree(subdir_3)
@@ -854,8 +871,10 @@ class full_tm_pipeline:
             pass        
         @follows(bam2normalized_cov)
         @mkdir(subdir_3)
-        @transform(self.args.working_dir+'/*.log', formatter(".log"),  
-                   os.path.join(subdir_3,"{basename[0]}"+".log"),
+        @transform(self.args.working_dir+'/*.log', 
+                   formatter(".log"),  
+                   os.path.join(subdir_3,
+                   "{basename[0]}"+".log"),
                    self.logger, self.logging_mutex)
         def save_log(input_files, output_files, logger, logging_mutex):
             """
@@ -868,9 +887,9 @@ class full_tm_pipeline:
             extern.run(cmd)      
      
      
-        subdir_4= os.path.join(self.args.output_dir,"reads_distribution") 
+        subdir_4 = os.path.join(self.args.output_dir,"reads_distribution") 
         @mkdir(subdir_4)
-        @collate(save_log,formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
+        @collate(save_log, formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
                  subdir_4+"/{BASE[0]}_reads_stat",'{BASE[0]}')
         def logtable (input_files,output_file,basename):
             """
@@ -920,8 +939,8 @@ class full_tm_pipeline:
                 numpy.savetxt(output_file,numpy.transpose(tab),delimiter='\t', fmt="%s") 
        
 
-        @merge(logtable,os.path.join(self.args.output_dir,'summary_reads'),self.logger, self.logging_mutex)
-        def concatenate_logtables (input_files,output_file,logger,logging_mutex):
+        @merge(logtable, os.path.join(self.args.output_dir, 'summary_reads'), self.logger, self.logging_mutex)
+        def concatenate_logtables (input_files, output_file, logger, logging_mutex):
             """
             Concatenate the summuries of reads distribution from all samples
             """
@@ -939,7 +958,7 @@ class full_tm_pipeline:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # save the processed metaT reads
         
-        subdir_4 = os.path.join(self.args.output_dir,"processed_reads/")
+        subdir_4 = os.path.join(self.args.output_dir, "processed_reads/")
         # clean the dir (of previous run output)
         try:
             shutil.rmtree(subdir_4)
@@ -958,7 +977,7 @@ class full_tm_pipeline:
             Copy the processed reads in the ouptut directory
             """
             for i in range(3):
-                cmd ="cp %s %s " %(input_file[i],output_file[i] )
+                cmd = "cp %s %s " %(input_file[i],output_file[i] )
 
                 with logging_mutex:
                     logger.info("Copy the processed reads %s in the ouptut directory" %(input_file[i]))

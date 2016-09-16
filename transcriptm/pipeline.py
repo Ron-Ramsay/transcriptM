@@ -20,7 +20,8 @@
 # 21: collate(trimmomatic, # Stage 2a; subdivide(phiX_map, # Stage 3a; collate(concat_for_mapping, # Stage 5a"
 # 22: Tidy-up." 
 # 23: Further tidy-up." 
-print "24: Try named parameters from transform(task_func = phiX_ID, ..." 
+# 24: Try named parameters from transform(task_func = phiX_ID, ..." 
+print "25: Try named parameters from transform(task_func = phiX_extract, ... add_inputs ..."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -474,12 +475,12 @@ class full_tm_pipeline:
                     logger.debug("phiX_extract: cmdline\n"+ cmd)
                 extern.run(cmd) 
                 
-        main_pl.transform(phiX_extract, # Stage 3e
-            QC_output,
-            ruffus.suffix(".fq.gz"), 
-            ruffus.add_inputs(phiX_concat_ID), 
-            "_phiX_ext.fq", 
-            self.logger, self.logging_mutex)
+        main_pl.transform(task_func = phiX_extract, # Stage 3e
+            input = QC_output,
+            filter = ruffus.suffix(".fq.gz"), 
+            add_inputs = ruffus.add_inputs(phiX_concat_ID), 
+            output = "_phiX_ext.fq", 
+            extras = [self.logger, self.logging_mutex])
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_4

@@ -16,7 +16,8 @@
 # 34. tidy-up; also reduced code width from 121 to 120 chars."
 # 35: Separated all the former @decorator functions that build the pipeline from the functions they decorate."
 # 36: Moved some of the pipeline building control code around."  
-print "37: partial use of self.SUBDIR_ constants."  
+# 37: partial use of self.SUBDIR_ constants."  
+print "38: use of self.SUBDIR_ constants in clear function."  
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -1026,7 +1027,8 @@ class full_tm_pipeline:
             )\
         .mkdir(subdir_4)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(save_log, # Stage T3a
+        rpl.transform(
+            save_log, # Stage T3a
             self.args.working_dir+'/*.log', 
             ruffus.formatter(".log"),  
             os.path.join(subdir_3,
@@ -1076,30 +1078,51 @@ class full_tm_pipeline:
             intended to be performed after the pipeline stages have been run.
             """
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        def rename_output_files_original_name():
+#        def rename_output_files_original_name():
+#            """ renames all files in output directories with their 'real name'. (???)
+#                """
+#            # Files under these particular subdirectories of the program's output directory are the ones to be renamed:
+#            for subDir in ["log/", "FastQC_raw/", "FastQC_processed/", "processed_reads/"]:
+#                # Get the current subdirectory's full pathname:
+#                fullDir = os.path.join(self.args.output_dir, subDir)
+#                # Iterate through each file in that subdirectory, to rename the file.
+#                for f in os.listdir(fullDir):
+#                    f_oldname = os.path.join(fullDir, f)          
+#                    f_newname = os.path.join(fullDir, 
+#                        # Replace the first part of the filenames, i.e. up to the first "_",
+#                        # by the first part of `self.prefix_pe`, i.e. up to the first "_". 
+#                        string.replace(f, f.split('_')[0], self.prefix_pe[f.split('_')[0]]))
+#                    os.rename(f_oldname, f_newname)
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        def rename_SUBDIRs_content():
             """ renames all files in output directories with their 'real name'. (???)
                 """
             # Files under these particular subdirectories of the program's output directory are the ones to be renamed:
-            for subDir in ["log/", "FastQC_raw/", "FastQC_processed/", "processed_reads/"]:
-                # Get the current subdirectory's full pathname:
-                fullDir = os.path.join(self.args.output_dir, subDir)
+            for subdir in self.SUBDIRS_for_content_renaming:
                 # Iterate through each file in that subdirectory, to rename the file.
-                for f in os.listdir(fullDir):
-                    f_oldname = os.path.join(fullDir, f)          
-                    f_newname = os.path.join(fullDir, 
+                for f in os.listdir(subdir):
+                    f_oldname = os.path.join(subdir, f)          
+                    f_newname = os.path.join(subdir, 
                         # Replace the first part of the filenames, i.e. up to the first "_",
                         # by the first part of `self.prefix_pe`, i.e. up to the first "_". 
                         string.replace(f, f.split('_')[0], self.prefix_pe[f.split('_')[0]]))
                     os.rename(f_oldname, f_newname)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        def remove_reads_distribution_dir():
-            ''' removes the "reads_distribution" subdirectory of the program's output directory.
-                '''
-            try:
-                shutil.rmtree(os.path.join(self.args.output_dir, "reads_distribution/"))
-            except OSError:
-                pass
+#        def remove_reads_distribution_dir():
+#            ''' removes the "reads_distribution" subdirectory of the program's output directory.
+#                '''
+#            try:
+#                shutil.rmtree(os.path.join(self.args.output_dir, "reads_distribution/"))
+#            except OSError:
+#                pass
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rename_output_files_original_name()
-        remove_reads_distribution_dir()
+        def clear_SUBDIRs():
+            for subdir in self.SUBDIRS_for_clearing:
+                try:
+                    shutil.rmtree(subdir)
+                except OSError:
+                    pass
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rename_SUBDIRs_content()
+        clear_SUBDIRs()
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

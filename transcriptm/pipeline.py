@@ -18,7 +18,8 @@
 # 36: Moved some of the pipeline building control code around."  
 # 37: partial use of self.SUBDIR_ constants."  
 # 38: use of self.SUBDIR_ constants in clear function."  
-print "39: use of self.SUBDIR_ constants to replace all subdir_ variables."  
+# 39: use of self.SUBDIR_ constants to replace all subdir_ variables."  
+print "40: use of self.SUBDIR_ constants to erase dirs at the start in one place."  
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -128,9 +129,9 @@ class full_tm_pipeline:
                 self.prt_progress( \
                     self.prefix_pe['sample-'+str(i)], 'raw data', 'FastQC-check', 'raw reads', str(count), '100.00 %')
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        def setup_SUBDIRS():
+        def V_SUBDIRS():
             """ sets up constant strings representing basename strings of subdirectories to be created 
-                under the output directory """
+                under the output directory, and clears them from previous runs. """
             # names of subdirectories:
             self.SUBDIR_log                = os.path.join(self.args.output_dir, "log")
             self.SUBDIR_FastQC_raw         = os.path.join(self.args.output_dir, "FastQC_raw")
@@ -146,6 +147,17 @@ class full_tm_pipeline:
             # list of subdirectories to be deleted at the end of the pipeline.
             self.SUBDIRS_for_clearing = [
                 self.SUBDIR_reads_distribution]
+            # Clean the subdirs (of previous run output). ###! Shouldn't we clear the whole output directory?
+            for subdir in [
+                    self.SUBDIR_log,
+                    self.SUBDIR_FastQC_raw,
+                    self.SUBDIR_FastQC_processed,
+                    self.SUBDIR_reads_distribution,
+                    self.SUBDIR_processed_reads]:
+                try:
+                    shutil.rmtree(self.SUBDIR_FastQC_raw)
+                except OSError:
+                    pass          
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def setup_logging():
             """ sets up Ruffus' standard python logger, which can be synchronised across concurrent Ruffus tasks.
@@ -164,8 +176,7 @@ class full_tm_pipeline:
         V_alias_pe()
         V_prefix_pe()
         V_tot_pe()
-        # Name the subdirectories of the output directory.
-        setup_SUBDIRS()        
+        V_SUBDIRS()
         # Set up logging.
         setup_logging()              
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -406,7 +417,8 @@ class full_tm_pipeline:
         def concat_for_mapping(input_files, output_files, ID_single, logger, logging_mutex): # Stage 5a
             """ Prepare .fq files for the mapping stage
                 """
-            cmd_ID = "comm -3 <(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s |sort) <(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s | sort) | awk  '{print $1 $2}' > %s" %(input_files[0], input_files[1],ID_single)            
+            cmd_ID = "comm -3 <(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s |sort) <(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s | sort) | awk  '{print $1 $2}' > %s" % \
+                    (input_files[0], input_files[1], ID_single)            
 #            cmd_ID = "comm -3 <(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s |sort) " + \
 #                    "<(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s | sort) | awk  '{print $1 $2}' > %s"%(\
 #                    input_files[0], 
@@ -831,7 +843,7 @@ class full_tm_pipeline:
             )\
         .mkdir(self.args.working_dir)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform( symlink_to_wd_metaG_index, # Stage 1c
+        rpl.transform(symlink_to_wd_metaG_index, # Stage 1c
             [self.args.metaG_contigs+x for x in ['.amb','.bwt','.ann','.pac','.sa']], 
             ruffus.formatter(),
             # move to working directory
@@ -858,8 +870,7 @@ class full_tm_pipeline:
             self.logger, self.logging_mutex
             )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(
-            task_func = phiX_ID, # Stage 3b
+        rpl.transform(task_func = phiX_ID, # Stage 3b
             input = phiX_map,
             filter = ruffus.suffix(".bam"),
             output = ".txt",
@@ -964,11 +975,11 @@ class full_tm_pipeline:
             )\
         .mkdir(self.args.output_dir)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # clean the dir (of previous run output)
-        try:
-            shutil.rmtree(self.SUBDIR_FastQC_raw)
-        except OSError:
-            pass          
+#        # clean the dir (of previous run output)
+#        try:
+#            shutil.rmtree(self.SUBDIR_FastQC_raw)
+#        except OSError:
+#            pass          
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Create the first output: a fastqc report of raw DATA
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -983,15 +994,15 @@ class full_tm_pipeline:
         .mkdir(self.SUBDIR_FastQC_raw)\
         .follows(bam2normalized_cov)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        #RKR:b
-        # Create the second output: a fastqc report of processed DATA
-        #subdir_2 = os.path.join(self.args.output_dir, "FastQC_processed")
-        #subdir_2 = self.SUBDIR_FastQC_processed
-        # clean the dir (of previous run output)
-        try:
-            shutil.rmtree(self.SUBDIR_FastQC_processed)
-        except OSError:
-            pass          
+#        #RKR:b
+#        # Create the second output: a fastqc report of processed DATA
+#        #subdir_2 = os.path.join(self.args.output_dir, "FastQC_processed")
+#        #subdir_2 = self.SUBDIR_FastQC_processed
+#        # clean the dir (of previous run output)
+#        try:
+#            shutil.rmtree(self.SUBDIR_FastQC_processed)
+#        except OSError:
+#            pass          
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl.transform(
             view_processed_data, # Stage T2a
@@ -1004,18 +1015,18 @@ class full_tm_pipeline:
         .mkdir(self.SUBDIR_FastQC_processed)\
         .follows(bam2normalized_cov)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        #RKR:b
-        #subdir_3 = os.path.join(self.args.output_dir, "log/")
-        #subdir_3 = self.SUBDIR_log
-        # clean the dir (of previous run output)
-        try:
-            shutil.rmtree(self.SUBDIR_log)
-        except OSError:
-            pass        
+#        #RKR:b
+#        #subdir_3 = os.path.join(self.args.output_dir, "log/")
+#        #subdir_3 = self.SUBDIR_log
+#        # clean the dir (of previous run output)
+#        try:
+#            shutil.rmtree(self.SUBDIR_log)
+#        except OSError:
+#            pass        
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        #RKR:b
-        #subdir_4 = os.path.join(self.args.output_dir, "reads_distribution") 
-        #subdir_4 = self.SUBDIR_reads_distribution
+#        RKR:b
+#        subdir_4 = os.path.join(self.args.output_dir, "reads_distribution") 
+#        subdir_4 = self.SUBDIR_reads_distribution
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl.collate(
             logtable, # Stage T4a  
@@ -1044,14 +1055,14 @@ class full_tm_pipeline:
             self.logger, self.logging_mutex
             )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        #RKR:b
-        #subdir_4 = os.path.join(self.args.output_dir, "processed_reads/")
-        #subdir_4 = self.SUBDIR_processed_reads
-        # clean the dir (of previous run output)
-        try:
-            shutil.rmtree(self.SUBDIR_processed_reads)
-        except OSError:
-            pass  
+#        #RKR:b
+#        #subdir_4 = os.path.join(self.args.output_dir, "processed_reads/")
+#        #subdir_4 = self.SUBDIR_processed_reads
+#        # clean the dir (of previous run output)
+#        try:
+#            shutil.rmtree(self.SUBDIR_processed_reads)
+#        except OSError:
+#            pass  
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl.transform(
             save_processed_reads, # Stage T4c

@@ -25,7 +25,8 @@
 # 25: Try named parameters from transform(task_func = phiX_extract, ... add_inputs ..."
 # 26: Rename main_pl to rpl (ruffus pipeline)."
 # 27: Reduced code width to 121 characters (visible in Github, half screen)."
-print "28: transform(save_processed_reads, # Stage T4c ... .follows(mkdir(subdir_4))."
+# 28: transform(save_processed_reads, # Stage T4c ... .follows(mkdir(subdir_4))."
+print "29: more .follows(mkdir("
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -269,12 +270,13 @@ class full_tm_pipeline:
 #            .follows(mkdir(self.args.working_dir))
             
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        @mkdir(self.args.working_dir)
-        @transform(self.args.metaG_contigs, ruffus.formatter(),
-                        # move to working directory
-                        os.path.join(self.args.working_dir,"{basename[0]}"+".fa"),
-                        self.logger, self.logging_mutex)
-        def symlink_to_wd_metaG (input_file, soft_link_name, logger, logging_mutex): # Stage 1b)
+        # Stage 1b
+#        @mkdir(self.args.working_dir)
+#        @transform(self.args.metaG_contigs, ruffus.formatter(),
+#                        # move to working directory
+#                        os.path.join(self.args.working_dir,"{basename[0]}"+".fa"),
+#                        self.logger, self.logging_mutex)
+        def symlink_to_wd_metaG (input_file, soft_link_name, logger, logging_mutex): # Stage 1b
             """
             Make soft link in working directory
             """
@@ -282,7 +284,14 @@ class full_tm_pipeline:
                 logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
             self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
 
-        
+        rpl.transform(symlink_to_wd_metaG, #Stage 1b
+                self.args.metaG_contigs, 
+                ruffus.formatter(),
+                # move to working directory
+                os.path.join(self.args.working_dir,"{basename[0]}"+".fa"),
+                self.logger, self.logging_mutex)\
+        .follows(mkdir(self.args.working_dir))
+
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # check if bwa index are present 
         @active_if(self.has_index(self.args.metaG_contigs,['.amb','.bwt','.ann','.pac','.sa']))
@@ -805,11 +814,11 @@ class full_tm_pipeline:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
         # Concatenate all the normalized_cov results in a table
-        @mkdir(self.args.output_dir)
-        @merge(bam2normalized_cov, \
-            os.path.join(self.args.output_dir,os.path.basename(self.args.output_dir)+'_NORM_COVERAGE.csv'), \
-            self.logger, self.logging_mutex)
-        def transcriptM_table (input_files, output_file, logger, logging_mutex): # Stage 7
+#        @mkdir(self.args.output_dir)
+#        @merge(bam2normalized_cov, \
+#            os.path.join(self.args.output_dir,os.path.basename(self.args.output_dir)+'_NORM_COVERAGE.csv'), \
+#            self.logger, self.logging_mutex)
+        def transcriptM_table (input_files, output_file, logger, logging_mutex): # Stage 7a
             """
             Create one table that contains RPKM values for each gene of each bin for the different samples
             """
@@ -867,16 +876,22 @@ class full_tm_pipeline:
                 logger.info("Create table that contains normalized_cov values for each gene of each bin given " + \
                     "as input for the different samples: %s" %(','.join(self.prefix_pe.values())))    
             
+        rpl.merge(transcriptM_table, # Stage 7a
+            bam2normalized_cov, 
+            os.path.join(self.args.output_dir,os.path.basename(self.args.output_dir)+'_NORM_COVERAGE.csv'),
+            self.logger, self.logging_mutex)\
+        .follows(mkdir(self.args.output_dir))
+
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_7 BIS (raw count table)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
         # Concatenate all the raw count in a table
-        @mkdir(self.args.output_dir)
-        @merge(bam2raw_count,
-            os.path.join(self.args.output_dir,os.path.basename(self.args.output_dir)+'_COUNT.csv'),
-            self.logger, self.logging_mutex)
-        def raw_count_table (input_files, output_file, logger, logging_mutex): 
+#        @mkdir(self.args.output_dir)
+#        @merge(bam2raw_count,
+#            os.path.join(self.args.output_dir,os.path.basename(self.args.output_dir)+'_COUNT.csv'),
+#            self.logger, self.logging_mutex)
+        def raw_count_table (input_files, output_file, logger, logging_mutex): # Stage 7b
             """
             Create one table that contains raw count values for each gene of each bin for the different samples
             """
@@ -929,6 +944,12 @@ class full_tm_pipeline:
             with logging_mutex:     
                 logger.info("Create table that contains raw count values for each gene of each bin given as input " + \
                     "for the different samples: %s"%(','.join(self.prefix_pe.values())))    
+
+        rpl.merge(raw_count_table, # Stage 7b
+            bam2raw_count,
+            os.path.join(self.args.output_dir,os.path.basename(self.args.output_dir)+'_COUNT.csv'),
+            self.logger, self.logging_mutex)\
+        .follows(mkdir(self.args.output_dir))
     
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: TRACE FILE N_1
@@ -1023,16 +1044,18 @@ class full_tm_pipeline:
             with logging_mutex:
                 logger.info("Save log files: %(input_files)s" % locals())
                 logger.debug("save_log: cmdline\n"+cmd)                
-            extern.run(cmd)      
+            extern.run(cmd)
+            
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         subdir_4 = os.path.join(self.args.output_dir, "reads_distribution") 
+        
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         @mkdir(subdir_4)
         @collate(save_log, 
             ruffus.formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|" + \
                 "(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
             subdir_4+"/{BASE[0]}_reads_stat",'{BASE[0]}')
-        def logtable(input_files, output_file, basename):
+        def logtable(input_files, output_file, basename): # Stage T4a
             """
             Sums up the count of reads which are kept after each step 
             """
@@ -1078,7 +1101,14 @@ class full_tm_pipeline:
                       map(str,stat.get_all_tot_percentage()) ,
                       map(str,stat.get_all_percentage_prev())])
                 numpy.savetxt(output_file,numpy.transpose(tab),delimiter='\t', fmt="%s") 
-       
+        
+#        rpl.collate(logtable, # Stage T4a
+#            save_log, 
+#            ruffus.formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|" + \
+#                "(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
+#            subdir_4+"/{BASE[0]}_reads_stat",'{BASE[0]}')\
+#        .follows(mkdir(subdir_4))
+
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage T4b
 #        @merge(logtable, os.path.join(self.args.output_dir, 'summary_reads'), self.logger, self.logging_mutex)

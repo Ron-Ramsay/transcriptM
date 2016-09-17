@@ -28,7 +28,8 @@
 # 28: transform(save_processed_reads, # Stage T4c ... .follows(mkdir(subdir_4))."
 # 29: more .follows(mkdir("
 # 30: collate(logtable, # Stage T4a"
-print "31: transform(symlink_to_wd_metaG_index, ...\ .active_if(..."
+" 31: transform(symlink_to_wd_metaG_index, ...\ .active_if(..."
+print "32: removed all @decorators."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -51,7 +52,7 @@ import ruffus        # light-weight computational pipeline management. See http:
 #RKR: Remove these once ruffus decorators are gone.
 from ruffus import follows, originate, transform ### collate, merge, subdivide  # ruffus decorators.
 # from ruffus import regex, formatter, add_inputs, suffix                 # ruffus filter / indicators.
-from ruffus import active_if, mkdir                                          # ruffus other.
+from ruffus import mkdir ### active_if,                                          # ruffus other.
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Locally written modules
@@ -255,10 +256,9 @@ class full_tm_pipeline:
         # Create symbolic link of inputs files in the working directory
         
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        #RKR
-        @mkdir(self.args.working_dir)
-        @originate(self.alias_pe.keys(), self.logger, self.logging_mutex)
-        def symlink_to_wd_metaT (soft_link_name, logger, logging_mutex): # Stage 1a)
+#        @mkdir(self.args.working_dir)
+#        @originate(self.alias_pe.keys(), self.logger, self.logging_mutex)
+        def symlink_to_wd_metaT (soft_link_name, logger, logging_mutex): # Stage 1a
             """
             Make soft link in working directory
             """
@@ -266,10 +266,11 @@ class full_tm_pipeline:
             with logging_mutex:
                 logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
             self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
-        #RKR:
-#        rpl\
-#            .originate(symlink_to_wd_metaT, self.alias_pe.keys(), self.logger, self.logging_mutex)\
-#            .follows(mkdir(self.args.working_dir))
+
+        rpl.originate(symlink_to_wd_metaT, # Stage 1a
+            self.alias_pe.keys(), 
+            self.logger, self.logging_mutex)\
+        .follows(mkdir(self.args.working_dir))
             
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 1b
@@ -975,12 +976,12 @@ class full_tm_pipeline:
         except OSError:
             pass          
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        @follows(bam2normalized_cov)
-        @mkdir(subdir_1)
-        @transform(symlink_to_wd_metaT, ruffus.formatter(),
-                        # move to output directory
-                        os.path.join(subdir_1,"{basename[0]}"+"_fastqc.zip"),
-                        self.logger, self.logging_mutex)
+#        @follows(bam2normalized_cov)
+#        @mkdir(subdir_1)
+#        @transform(symlink_to_wd_metaT, ruffus.formatter(),
+#                        # move to output directory
+#                        os.path.join(subdir_1,"{basename[0]}"+"_fastqc.zip"),
+#                        self.logger, self.logging_mutex)
         def view_raw_data(input_file, soft_link_name, logger, logging_mutex): # Stage T1a
             """
             Create a fastQC report in the ouptut directory
@@ -994,7 +995,16 @@ class full_tm_pipeline:
                 logger.info("Create a fastqc report of raw %(input_file)s" % locals())
                 logger.debug("view_raw_data: cmdline\n"+cmd)
             extern.run(cmd)
-    
+
+        rpl.transform(view_raw_data, # Stage T1a
+            symlink_to_wd_metaT, 
+            ruffus.formatter(),
+            # move to output directory
+            os.path.join(subdir_1,"{basename[0]}"+"_fastqc.zip"),
+            self.logger, self.logging_mutex)\
+        .follows(mkdir(subdir_1))\
+        .follows(bam2normalized_cov)
+        
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: TRACE FILE N_2
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1008,12 +1018,12 @@ class full_tm_pipeline:
             pass          
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        @follows(bam2normalized_cov)
-        @mkdir(subdir_2)
-        @transform(trimmomatic, ruffus.formatter(),
-                        # move to output directory
-                        os.path.join(subdir_2,"{basename[0]}"+"_fastqc.zip"),
-                        self.logger, self.logging_mutex)
+#        @follows(bam2normalized_cov)
+#        @mkdir(subdir_2)
+#        @transform(trimmomatic, ruffus.formatter(),
+#                        # move to output directory
+#                        os.path.join(subdir_2,"{basename[0]}"+"_fastqc.zip"),
+#                        self.logger, self.logging_mutex)
         def view_processed_data (input_file, soft_link_name, logger, logging_mutex): # Stage T2a
             """
             Create a fastQC report in the ouptut directory
@@ -1028,6 +1038,15 @@ class full_tm_pipeline:
                 logger.debug("view_processed_data: cmdline\n"+cmd)
             extern.run(cmd)
 
+        rpl.transform(view_processed_data, # Stage T2a
+            trimmomatic, 
+            ruffus.formatter(),
+            # move to output directory
+            os.path.join(subdir_2,"{basename[0]}"+"_fastqc.zip"),
+            self.logger, self.logging_mutex)\
+        .follows(mkdir(subdir_2))\
+        .follows(bam2normalized_cov)
+
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE:TRACE FILE N_3
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1041,13 +1060,13 @@ class full_tm_pipeline:
             pass        
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        @follows(bam2normalized_cov)
-        @mkdir(subdir_3)
-        @transform(self.args.working_dir+'/*.log', 
-                   ruffus.formatter(".log"),  
-                   os.path.join(subdir_3,
-                   "{basename[0]}"+".log"),
-                   self.logger, self.logging_mutex)
+#        @follows(bam2normalized_cov)
+#        @mkdir(subdir_3)
+#        @transform(self.args.working_dir+'/*.log', 
+#                   ruffus.formatter(".log"),  
+#                   os.path.join(subdir_3,
+#                   "{basename[0]}"+".log"),
+#                   self.logger, self.logging_mutex)
         def save_log(input_files, output_files, logger, logging_mutex): # Stage T3a
             """
             Save the log files, generated for different stages of the pipeline (in the temp directory)
@@ -1057,6 +1076,15 @@ class full_tm_pipeline:
                 logger.info("Save log files: %(input_files)s" % locals())
                 logger.debug("save_log: cmdline\n"+cmd)                
             extern.run(cmd)
+
+        rpl.transform(save_log, # Stage T3a
+            self.args.working_dir+'/*.log', 
+            ruffus.formatter(".log"),  
+            os.path.join(subdir_3,
+            "{basename[0]}"+".log"),
+            self.logger, self.logging_mutex)\
+        .follows(mkdir(subdir_3))\
+        .follows(bam2normalized_cov)
             
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         subdir_4 = os.path.join(self.args.output_dir, "reads_distribution") 

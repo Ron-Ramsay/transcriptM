@@ -17,7 +17,8 @@
 # 35: Separated all the former @decorator functions that build the pipeline from the functions they decorate."
 # 36: Moved some of the pipeline building control code around."  
 # 37: partial use of self.SUBDIR_ constants."  
-print "38: use of self.SUBDIR_ constants in clear function."  
+# 38: use of self.SUBDIR_ constants in clear function."  
+print "39: use of self.SUBDIR_ constants to replace all subdir_ variables."  
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -705,12 +706,12 @@ class full_tm_pipeline:
                 """
             cmd = "fastqc %s -o %s --threads %d --quiet; rm %s/*.zip" %(
                 input_file,
-                subdir_1, 
+                self.SUBDIR_FastQC_raw, ###! IMPROVE: Consider passing as function parameter.
                 self.args.threads,
-                subdir_1)
+                self.SUBDIR_FastQC_raw) ###! IMPROVE: Consider passing as function parameter.
             with logging_mutex:
                 logger.info("Create a fastqc report of raw %(input_file)s" % locals())
-                logger.debug("view_raw_data: cmdline\n"+cmd)
+                logger.debug("view_raw_data: cmdline\n" + cmd)
             extern.run(cmd)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def view_processed_data(input_file, soft_link_name, logger, logging_mutex): # Stage T2a
@@ -718,9 +719,9 @@ class full_tm_pipeline:
                 """
             cmd = "fastqc %s -o %s --threads %d --quiet; rm %s/*.zip" %(
                     ' '.join(input_file),
-                    subdir_2, 
+                    self.SUBDIR_FastQC_processed, ###! IMPROVE: Consider passing as function parameter.
                     self.args.threads,
-                    subdir_2 )
+                    self.SUBDIR_FastQC_processed) ###! IMPROVE: Consider passing as function parameter.
             with logging_mutex:
                 logger.info("Create a fastqc report of processed %(input_file)s" % locals())
                 logger.debug("view_processed_data: cmdline\n"+cmd)
@@ -963,34 +964,32 @@ class full_tm_pipeline:
             )\
         .mkdir(self.args.output_dir)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        #RKR:b
-        # Create the first output: a fastqc report of raw DATA
-        #subdir_1 = os.path.join(self.args.output_dir, "FastQC_raw")
-        subdir_1 = self.SUBDIR_FastQC_raw        
         # clean the dir (of previous run output)
         try:
-            shutil.rmtree(subdir_1)
+            shutil.rmtree(self.SUBDIR_FastQC_raw)
         except OSError:
             pass          
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Create the first output: a fastqc report of raw DATA
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl.transform(
             view_raw_data, # Stage T1a
             symlink_to_wd_metaT, 
             ruffus.formatter(),
             # move to output directory
-            os.path.join(subdir_1,"{basename[0]}"+"_fastqc.zip"),
+            os.path.join(self.SUBDIR_FastQC_raw, "{basename[0]}"+"_fastqc.zip"),
             self.logger, self.logging_mutex
             )\
-        .mkdir(subdir_1)\
+        .mkdir(self.SUBDIR_FastQC_raw)\
         .follows(bam2normalized_cov)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         #RKR:b
         # Create the second output: a fastqc report of processed DATA
         #subdir_2 = os.path.join(self.args.output_dir, "FastQC_processed")
-        subdir_2 = self.SUBDIR_FastQC_processed
+        #subdir_2 = self.SUBDIR_FastQC_processed
         # clean the dir (of previous run output)
         try:
-            shutil.rmtree(subdir_2)
+            shutil.rmtree(self.SUBDIR_FastQC_processed)
         except OSError:
             pass          
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -999,43 +998,43 @@ class full_tm_pipeline:
             trimmomatic, 
             ruffus.formatter(),
             # move to output directory
-            os.path.join(subdir_2,"{basename[0]}"+"_fastqc.zip"),
+            os.path.join(self.SUBDIR_FastQC_processed,"{basename[0]}"+"_fastqc.zip"),
             self.logger, self.logging_mutex
             )\
-        .mkdir(subdir_2)\
+        .mkdir(self.SUBDIR_FastQC_processed)\
         .follows(bam2normalized_cov)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         #RKR:b
         #subdir_3 = os.path.join(self.args.output_dir, "log/")
-        subdir_3 = self.SUBDIR_log
+        #subdir_3 = self.SUBDIR_log
         # clean the dir (of previous run output)
         try:
-            shutil.rmtree(subdir_3)
+            shutil.rmtree(self.SUBDIR_log)
         except OSError:
             pass        
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         #RKR:b
         #subdir_4 = os.path.join(self.args.output_dir, "reads_distribution") 
-        subdir_4 = self.SUBDIR_reads_distribution
+        #subdir_4 = self.SUBDIR_reads_distribution
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl.collate(
             logtable, # Stage T4a  
             save_log, 
             ruffus.formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|" + \
                 "(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
-            subdir_4+"/{BASE[0]}_reads_stat",'{BASE[0]}'
+            self.SUBDIR_reads_distribution + "/{BASE[0]}_reads_stat",
+            '{BASE[0]}'
             )\
-        .mkdir(subdir_4)
+        .mkdir(self.SUBDIR_reads_distribution)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl.transform(
             save_log, # Stage T3a
             self.args.working_dir+'/*.log', 
             ruffus.formatter(".log"),  
-            os.path.join(subdir_3,
-            "{basename[0]}"+".log"),
+            os.path.join(self.SUBDIR_log, "{basename[0]}"+".log"),
             self.logger, self.logging_mutex
             )\
-        .mkdir(subdir_3)\
+        .mkdir(self.SUBDIR_log)\
         .follows(bam2normalized_cov)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl.merge(
@@ -1047,10 +1046,10 @@ class full_tm_pipeline:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         #RKR:b
         #subdir_4 = os.path.join(self.args.output_dir, "processed_reads/")
-        subdir_4 = self.SUBDIR_processed_reads
+        #subdir_4 = self.SUBDIR_processed_reads
         # clean the dir (of previous run output)
         try:
-            shutil.rmtree(subdir_4)
+            shutil.rmtree(self.SUBDIR_processed_reads)
         except OSError:
             pass  
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1058,12 +1057,12 @@ class full_tm_pipeline:
             save_processed_reads, # Stage T4c
             concat_for_mapping, ruffus.formatter(),
             # move to output directory
-            [os.path.join(subdir_4,"{basename[0]}{ext[0]}"),
-            os.path.join(subdir_4,"{basename[1]}{ext[1]}"),
-            os.path.join(subdir_4,"{basename[2]}{ext[2]}")],
+            [os.path.join(self.SUBDIR_processed_reads, "{basename[0]}{ext[0]}"),
+            os.path.join(self.SUBDIR_processed_reads, "{basename[1]}{ext[1]}"),
+            os.path.join(self.SUBDIR_processed_reads, "{basename[2]}{ext[2]}")],
             self.logger, self.logging_mutex
             )\
-        .mkdir(subdir_4)
+        .mkdir(self.SUBDIR_processed_reads)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: RUN
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1078,22 +1077,6 @@ class full_tm_pipeline:
             intended to be performed after the pipeline stages have been run.
             """
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#        def rename_output_files_original_name():
-#            """ renames all files in output directories with their 'real name'. (???)
-#                """
-#            # Files under these particular subdirectories of the program's output directory are the ones to be renamed:
-#            for subDir in ["log/", "FastQC_raw/", "FastQC_processed/", "processed_reads/"]:
-#                # Get the current subdirectory's full pathname:
-#                fullDir = os.path.join(self.args.output_dir, subDir)
-#                # Iterate through each file in that subdirectory, to rename the file.
-#                for f in os.listdir(fullDir):
-#                    f_oldname = os.path.join(fullDir, f)          
-#                    f_newname = os.path.join(fullDir, 
-#                        # Replace the first part of the filenames, i.e. up to the first "_",
-#                        # by the first part of `self.prefix_pe`, i.e. up to the first "_". 
-#                        string.replace(f, f.split('_')[0], self.prefix_pe[f.split('_')[0]]))
-#                    os.rename(f_oldname, f_newname)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def rename_SUBDIRs_content():
             """ renames all files in output directories with their 'real name'. (???)
                 """
@@ -1107,14 +1090,6 @@ class full_tm_pipeline:
                         # by the first part of `self.prefix_pe`, i.e. up to the first "_". 
                         string.replace(f, f.split('_')[0], self.prefix_pe[f.split('_')[0]]))
                     os.rename(f_oldname, f_newname)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#        def remove_reads_distribution_dir():
-#            ''' removes the "reads_distribution" subdirectory of the program's output directory.
-#                '''
-#            try:
-#                shutil.rmtree(os.path.join(self.args.output_dir, "reads_distribution/"))
-#            except OSError:
-#                pass
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def clear_SUBDIRs():
             for subdir in self.SUBDIRS_for_clearing:

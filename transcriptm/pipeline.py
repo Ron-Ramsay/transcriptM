@@ -15,7 +15,8 @@
 # 33: removed every @decorator."
 # 34. tidy-up; also reduced code width from 121 to 120 chars."
 # 35: Separated all the former @decorator functions that build the pipeline from the functions they decorate."
-print "36: Moved some of the pipeline building control code around."  
+# 36: Moved some of the pipeline building control code around."  
+print "37: partial use of self.SUBDIR_ constants."  
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -129,11 +130,11 @@ class full_tm_pipeline:
             """ sets up constant strings representing basename strings of subdirectories to be created 
                 under the output directory """
             # names of subdirectories:
-            self.SUBDIR_log                = "log"
-            self.SUBDIR_FastQC_raw         = "FastQC_raw"
-            self.SUBDIR_FastQC_processed   = "FastQC_processed"
-            self.SUBDIR_reads_distribution = "reads_distribution"
-            self.SUBDIR_processed_reads    = "processed_reads"
+            self.SUBDIR_log                = os.path.join(self.args.output_dir, "log")
+            self.SUBDIR_FastQC_raw         = os.path.join(self.args.output_dir, "FastQC_raw")
+            self.SUBDIR_FastQC_processed   = os.path.join(self.args.output_dir, "FastQC_processed")
+            self.SUBDIR_reads_distribution = os.path.join(self.args.output_dir, "reads_distribution")
+            self.SUBDIR_processed_reads    = os.path.join(self.args.output_dir, "processed_reads")
             # list of subdirectories to have their contents processed at the end of the pipeline.
             self.SUBDIRS_for_content_renaming = [
                 self.SUBDIR_log,
@@ -162,7 +163,7 @@ class full_tm_pipeline:
         V_prefix_pe()
         V_tot_pe()
         # Name the subdirectories of the output directory.
-        # setup_SUBDIRS():        
+        setup_SUBDIRS()        
         # Set up logging.
         setup_logging()              
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -963,7 +964,8 @@ class full_tm_pipeline:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         #RKR:b
         # Create the first output: a fastqc report of raw DATA
-        subdir_1 = os.path.join(self.args.output_dir, "FastQC_raw")
+        #subdir_1 = os.path.join(self.args.output_dir, "FastQC_raw")
+        subdir_1 = self.SUBDIR_FastQC_raw        
         # clean the dir (of previous run output)
         try:
             shutil.rmtree(subdir_1)
@@ -983,7 +985,8 @@ class full_tm_pipeline:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         #RKR:b
         # Create the second output: a fastqc report of processed DATA
-        subdir_2 = os.path.join(self.args.output_dir, "FastQC_processed")
+        #subdir_2 = os.path.join(self.args.output_dir, "FastQC_processed")
+        subdir_2 = self.SUBDIR_FastQC_processed
         # clean the dir (of previous run output)
         try:
             shutil.rmtree(subdir_2)
@@ -1002,7 +1005,8 @@ class full_tm_pipeline:
         .follows(bam2normalized_cov)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         #RKR:b
-        subdir_3 = os.path.join(self.args.output_dir, "log/")
+        #subdir_3 = os.path.join(self.args.output_dir, "log/")
+        subdir_3 = self.SUBDIR_log
         # clean the dir (of previous run output)
         try:
             shutil.rmtree(subdir_3)
@@ -1010,7 +1014,8 @@ class full_tm_pipeline:
             pass        
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         #RKR:b
-        subdir_4 = os.path.join(self.args.output_dir, "reads_distribution") 
+        #subdir_4 = os.path.join(self.args.output_dir, "reads_distribution") 
+        subdir_4 = self.SUBDIR_reads_distribution
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl.collate(
             logtable, # Stage T4a  
@@ -1039,7 +1044,8 @@ class full_tm_pipeline:
             )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         #RKR:b
-        subdir_4 = os.path.join(self.args.output_dir, "processed_reads/")
+        #subdir_4 = os.path.join(self.args.output_dir, "processed_reads/")
+        subdir_4 = self.SUBDIR_processed_reads
         # clean the dir (of previous run output)
         try:
             shutil.rmtree(subdir_4)

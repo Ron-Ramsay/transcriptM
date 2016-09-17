@@ -27,7 +27,8 @@
 # 27: Reduced code width to 121 characters (visible in Github, half screen)."
 # 28: transform(save_processed_reads, # Stage T4c ... .follows(mkdir(subdir_4))."
 # 29: more .follows(mkdir("
-print "30: collate(logtable, # Stage T4a"
+# 30: collate(logtable, # Stage T4a"
+print "31: transform(symlink_to_wd_metaG_index, ...\ .active_if(..."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -48,7 +49,7 @@ import extern        # version of Python's `subprocess`. See https://pypi.python
 import numpy         # array processing for numbers, strings, records, objects. See http://www.numpy.org/
 import ruffus        # light-weight computational pipeline management. See http://www.ruffus.org.uk
 #RKR: Remove these once ruffus decorators are gone.
-from ruffus import collate, follows, originate, transform ### merge, subdivide  # ruffus decorators.
+from ruffus import follows, originate, transform ### collate, merge, subdivide  # ruffus decorators.
 # from ruffus import regex, formatter, add_inputs, suffix                 # ruffus filter / indicators.
 from ruffus import active_if, mkdir                                          # ruffus other.
 
@@ -295,19 +296,29 @@ class full_tm_pipeline:
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # check if bwa index are present 
-        @active_if(self.has_index(self.args.metaG_contigs,['.amb','.bwt','.ann','.pac','.sa']))
-        @mkdir(self.args.working_dir)
-        @transform([self.args.metaG_contigs+x for x in ['.amb','.bwt','.ann','.pac','.sa'] ], ruffus.formatter(),
-                        # move to working directory
-                        os.path.join(self.args.working_dir,"{basename[0]}{ext[0]}"),
-                        self.logger, self.logging_mutex)
-        def symlink_to_wd_metaG_index (input_file, soft_link_name, logger, logging_mutex): # Stage 1c)
+#        @active_if(self.has_index(self.args.metaG_contigs,['.amb','.bwt','.ann','.pac','.sa']))
+#        @mkdir(self.args.working_dir)
+#        @transform([self.args.metaG_contigs+x for x in ['.amb','.bwt','.ann','.pac','.sa'] ], ruffus.formatter(),
+#                        # move to working directory
+#                        os.path.join(self.args.working_dir,"{basename[0]}{ext[0]}"),
+#                        self.logger, self.logging_mutex)
+        def symlink_to_wd_metaG_index (input_file, soft_link_name, logger, logging_mutex): # Stage 1c
             """
             Make soft link in working directory
             """
             with logging_mutex:
                 logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
             self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
+
+        #@active_if(self.has_index(self.args.metaG_contigs,['.amb','.bwt','.ann','.pac','.sa']))
+        rpl.transform(symlink_to_wd_metaG_index, # Stage 1c
+            [self.args.metaG_contigs+x for x in ['.amb','.bwt','.ann','.pac','.sa']], 
+            ruffus.formatter(),
+            # move to working directory
+            os.path.join(self.args.working_dir,"{basename[0]}{ext[0]}"),
+            self.logger, self.logging_mutex)\
+        .follows(mkdir(self.args.working_dir))\
+        .active_if(self.has_index(self.args.metaG_contigs,['.amb','.bwt','.ann','.pac','.sa']))
             
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_2

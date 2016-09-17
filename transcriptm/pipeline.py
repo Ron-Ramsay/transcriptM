@@ -1,8 +1,8 @@
 #!/usr/bin/env python
  
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Developer's temporary playground
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # 6: Documented imports; removed ipython import; made ruffus imports specific."
 # 7: Changed version.py to 0.3.3"
 # 7: Removed pipeline.py code that I had previously relocated to transcriptm as funct valid_adapters_fileloc which 
@@ -30,11 +30,12 @@
 # 30: collate(logtable, # Stage T4a"
 # 31: transform(symlink_to_wd_metaG_index, ...\ .active_if(..."
 # 32: removed all @decorators except mkdir."
-print "33: removed every @decorator."
+# 33: removed every @decorator."
+print "34. tidy-up; also reduced code width from 121 to 120 chars."
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 import os            # miscellaneous operating system interfaces.
 import subprocess    # spawn new processes, connect to their input/output/error pipes.
 import tempfile      # generates temporary files/dirs; works on all supported platforms.
@@ -43,34 +44,27 @@ import re            # regular expression operations.
 import string        # common string operations.
 import collections   # high-performance container datatypes.
 import shutil        # high-level file operations.
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # External, non-standard modules
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 import extern        # version of Python's `subprocess`. See https://pypi.python.org/pypi/extern/0.1.0
 import numpy         # array processing for numbers, strings, records, objects. See http://www.numpy.org/
 import ruffus        # light-weight computational pipeline management. See http://www.ruffus.org.uk
-#RKR: Remove these once ruffus decorators are gone.
-# from ruffus import collate, follows, merge, originate, subdivide, transform  # ruffus decorators.
-# from ruffus import regex, formatter, add_inputs, suffix                      # ruffus filter / indicators.
-# from ruffus import active_if, mkdir                                          # ruffus other.
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Locally written modules
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 from monitoring import Monitoring  # implements class `Monitoring`. (Locally-written module).
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Class
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 class full_tm_pipeline:
     """ a ruffus pipeline implementing all the stages of TranscriptM.
         """
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def __init__(self, args):
         """ (routines automatically executed upon instantiation of an instance of this class).
             """
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_ref_genome_phiX():
             """ instantiates and validates `self.ref_genome_phiX`: the filepath of the reference genome file (PhiX).
                 """
@@ -79,7 +73,7 @@ class full_tm_pipeline:
                 raise Exception("The subdirectory 2-PhiX/ or the file %s does not exist in %s (db_path provided)"
                                 %(os.path.basename(self.ref_genome_phiX), self.args.db_path))
                 exit(1)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_list_gff():
             """ instantiates and validates `self.list_gff`: the list of gff files.
                 """
@@ -87,7 +81,7 @@ class full_tm_pipeline:
             if len(set([os.path.basename(x) for x in self.list_gff])) < len(self.list_gff):
                 raise Exception ("--dir_bins args \nWarning: some gff files have the same name")
                 exit(1)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_alias_pe():
             """ populates dictionary `self.alias_pe`: 
                 index: original filenames (of metatranscriptomic reads), as listed in argument `paired_end`.
@@ -102,7 +96,7 @@ class full_tm_pipeline:
                     self.args.paired_end[2*i]
                 self.alias_pe[os.path.join(self.args.working_dir, 'sample-'+str(i)+'_R2.fq.gz')] = \
                     self.args.paired_end[2*i+1]
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_prefix_pe():
             """ populates dictionary `self.prefix_pe`:
                 index: "sample-n", where 'n' is the zero-based counter for each *pair* of filenames passed in `paired_end`. 
@@ -128,7 +122,7 @@ class full_tm_pipeline:
                 print [item for item, count in collections.Counter(self.prefix_pe.values()).items() if count > 1]
                 raise Exception ("2 sets of paired-ends files have the same prefix. Rename one set. \n")
                 exit(1)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_tot_pe():
             """ populates dictionary `self.tot_pe`:
                 index: descriptor of the longest common substring (trimmed of some types of trailing characters) 
@@ -146,7 +140,7 @@ class full_tm_pipeline:
                 self.tot_pe[self.prefix_pe['sample-'+str(i)]]=count
                 self.op_progress( \
                     self.prefix_pe['sample-'+str(i)], 'raw data', 'FastQC-check', 'raw reads', str(count), '100.00 %')
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def setup_logging():
             """ sets up Ruffus' standard python logger, which can be synchronised across concurrent Ruffus tasks.
                 Variables `self.logger` and `self.logging_mutex` are meant to be passed as parameters to each Ruffus job.  
@@ -154,7 +148,7 @@ class full_tm_pipeline:
                     `logging_mutex`: prevents different jobs which are logging simultaneously from being jumbled up.
                 """       
             self.logger, self.logging_mutex = ruffus.cmdline.setup_logging(__name__, args.log_file, args.verbose)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ''' function control: '''
         # Store arguments passed.
         self.args = args             
@@ -166,9 +160,9 @@ class full_tm_pipeline:
         V_tot_pe()
         # Set up logging.
         setup_logging()              
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Helper functions
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def re_symlink (self, input_file, soft_link_name, logger, logging_mutex):
         """ (helper): relinks soft symbolic link if necessary.
             (This function from the ruffus website: http://www.ruffus.org.uk/faq.html?highlight=re_symlink) 
@@ -195,7 +189,7 @@ class full_tm_pipeline:
         os.symlink(
             os.path.relpath(os.path.abspath(input_file), os.path.abspath(os.path.dirname(soft_link_name))), 
             soft_link_name)
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def get_files(self, directory, extension):
         """ (helper): returns a list of files with a specific extension in a directory and its subdirectories.
             """
@@ -205,7 +199,7 @@ class full_tm_pipeline:
                 if f.endswith(extension):
                     list_files.append(os.path.join(root, f))
         return list_files
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def has_index(self, f, list_extension):
         """ (helper): check if a file f has index 
             (if its directory also contains files ending with extensions given in a list).
@@ -216,7 +210,7 @@ class full_tm_pipeline:
                 index = False
                 break
         return index
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def longest_common_substring(self, S1, S2):
         """ (helper): returns the longest common substring between 2 strings.
             """
@@ -232,82 +226,84 @@ class full_tm_pipeline:
                 else:
                     M[x][y] = 0
         return S1[x_longest-longest: x_longest]
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def op_progress(self, name_sample, p2, p3, p4, p5, p6):
         """ prints out the provided parameters as a line formated in standard column widths.
             This function probably belongs in module Monitoring, but is put here until that is sorted out.
             """
         print "{0:20} {1:16} {2:16} {3:20} {4:>12}  {5:>8}".format(name_sample, p2, p3, p4, p5, p6)
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Pipeline Stages
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def pipeline_stages(self):
         ''' defines all the pipelined functions and runs them.
             '''
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Decorated functions are automatically part of a default constructed Pipeline named "main".
         rpl = ruffus.Pipeline.pipelines["main"] # "rpl: 'Ruffus PipeLine'."
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_1
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Create symbolic link of inputs files in the working directory
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def symlink_to_wd_metaT (soft_link_name, logger, logging_mutex): # Stage 1a
-            """
-            Make soft link in working directory
-            """
+            """ Make soft link in working directory.
+                """
             input_file = self.alias_pe[soft_link_name]
             with logging_mutex:
                 logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
             self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.originate(symlink_to_wd_metaT, # Stage 1a
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rpl.originate(
+            symlink_to_wd_metaT, # Stage 1a
             self.alias_pe.keys(), 
-            self.logger, self.logging_mutex)\
+            self.logger, self.logging_mutex
+            )\
         .mkdir(self.args.working_dir)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def symlink_to_wd_metaG (input_file, soft_link_name, logger, logging_mutex): # Stage 1b
-            """
-            Make soft link in working directory
-            """
+            """ Make soft link in working directory. 
+                """
             with logging_mutex:
                 logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
             self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(symlink_to_wd_metaG, #Stage 1b
-                self.args.metaG_contigs, 
-                ruffus.formatter(),
-                # move to working directory
-                os.path.join(self.args.working_dir,"{basename[0]}"+".fa"),
-                self.logger, self.logging_mutex)\
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rpl.transform(
+            symlink_to_wd_metaG, #Stage 1b
+            self.args.metaG_contigs, 
+            ruffus.formatter(),
+            # move to working directory
+            os.path.join(self.args.working_dir,"{basename[0]}"+".fa"),
+            self.logger, self.logging_mutex
+            )\
         .mkdir(self.args.working_dir)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # check if bwa index are present 
-        def symlink_to_wd_metaG_index (input_file, soft_link_name, logger, logging_mutex): # Stage 1c
-            """
-            Make soft link in working directory
-            """
+        def symlink_to_wd_metaG_index(input_file, soft_link_name, logger, logging_mutex): # Stage 1c
+            """ Make soft link in working directory
+                """
             with logging_mutex:
                 logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
             self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(symlink_to_wd_metaG_index, # Stage 1c
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rpl.transform(
+            symlink_to_wd_metaG_index, # Stage 1c
             [self.args.metaG_contigs+x for x in ['.amb','.bwt','.ann','.pac','.sa']], 
             ruffus.formatter(),
             # move to working directory
             os.path.join(self.args.working_dir,"{basename[0]}{ext[0]}"),
-            self.logger, self.logging_mutex)\
+            self.logger, self.logging_mutex
+            )\
         .mkdir(self.args.working_dir)\
         .active_if(self.has_index(self.args.metaG_contigs,['.amb','.bwt','.ann','.pac','.sa']))
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_2
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # First step in the QC process of the raw reads: trimming based on length and quality score     
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def trimmomatic(input_files, output_file,log, logger, logging_mutex): # Stage 2a
-            """
-            Trimmomatic. Trim and remove adapters of paired reads
-            """  
+            """ Trimmomatic. Trim and remove adapters of paired reads
+                """
             if len(input_files) != 2:
                 raise Exception("One of read pairs %s missing" % (input_files,))  
             
@@ -343,22 +339,23 @@ class full_tm_pipeline:
             self.op_progress(
                     name_sample, 'trimming', 'Trimmomatic', 'raw reads', 
                     str(processed_reads), stat.get_tot_percentage(processed_reads))
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.collate(trimmomatic, # Stage 2a
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rpl.collate(
+            trimmomatic, # Stage 2a
             symlink_to_wd_metaT,
             ruffus.regex("R[12].fq.gz$"),
             ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"],
             "trimmomatic.log",
-            self.logger, self.logging_mutex)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            self.logger, self.logging_mutex
+            )
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_3
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Second step in the QC process: remove phiX contamination
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def phiX_map(input_files, output_files, logger, logging_mutex): # Stage 3a
-            """
-            BamM make. Map all reads against PhiX genome
-            """
+            """ BamM make. Map all reads against PhiX genome.
+                """
             cmd = "bamm make -d %s -c %s %s -s %s %s -o %s --threads %d -K --quiet" %( \
                     self.ref_genome_phiX,
                     input_files[0],
@@ -371,41 +368,39 @@ class full_tm_pipeline:
                 logger.info("Map reads [%s] against phiX genome"%(','.join(input_files)))
                 logger.debug("phiX_map: cmdline\n"+ cmd)
             extern.run(cmd)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.subdivide(phiX_map, # Stage 3a
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rpl.subdivide(
+            phiX_map, # Stage 3a
             trimmomatic,
             ruffus.formatter(r"(.+)/(?P<BASE>.*)P1.fq.gz"),
             ["{path[0]}/phiX.{BASE[0]}P1.bam",
              "{path[0]}/phiX.{BASE[0]}U1.bam",
              "{path[0]}/phiX.{BASE[0]}U2.bam"], 
-            self.logger, self.logging_mutex)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            self.logger, self.logging_mutex
+            )
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def phiX_ID(input_files, output_files, logger, logging_mutex): # Stage 3b
-            """
-            Samtools. Get the IDs of PhiX reads
-            """
+            """ Samtools. Get the IDs of PhiX reads
+                """
             cmd = "samtools view -F4 %s | awk {'print $1'} > %s "%(input_files, output_files)
-            
             with logging_mutex:
                 logger.info("Extract ID of phiX reads in %s" %(input_files))
                 logger.debug("phiX_ID: cmdline\n" + cmd)
             extern.run(cmd)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl.transform(
-            task_func = phiX_ID, # Stage 3b # task_func
-            input = phiX_map, # input = 
-            filter = ruffus.suffix(".bam"), # filter = 
-            output = ".txt", # output = ?
+            task_func = phiX_ID, # Stage 3b
+            input = phiX_map,
+            filter = ruffus.suffix(".bam"),
+            output = ".txt",
             extras = [
-                self.logger, # logging 
-                self.logging_mutex
-                ]
+                self.logger,
+                self.logging_mutex]
             )
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def phiX_concat_ID(input_files, output_file, basename, logger, logging_mutex): # Stage 3c
-            """
-            Concatenate all PhiX ID found previously
-            """
+            """ Concatenate all PhiX ID found previously.
+                """
             cmd = "cat %s %s %s | uniq > %s" %(
                     input_files[0],
                     input_files[1],
@@ -415,7 +410,6 @@ class full_tm_pipeline:
                 logger.info("Concatenate all ID of phiX reads [%s]"%(','.join(input_files)))
                 logger.debug("phiX_concat_ID: cmdline\n" + cmd)
             extern.run(cmd) 
-       
            #  ~~~~ monitoring: count of reads  ~~~~ #                 
             name_sample = self.prefix_pe[os.path.basename(output_file).split('_trimm_phiX_ID.log')[0]]            
             stat= Monitoring(self.tot_pe[name_sample])
@@ -429,25 +423,27 @@ class full_tm_pipeline:
             self.op_progress(
                 name_sample, 'PhiX removal', 'bamM make', 'processed reads',
                 str(non_phiX_reads), stat.get_tot_percentage(non_phiX_reads))
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.collate(phiX_concat_ID, # Stage 3c
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rpl.collate(
+            phiX_concat_ID, # Stage 3c
             phiX_ID, 
             ruffus.formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),
             '{path[0]}/{BASE[0]}phiX_ID.log','{BASE[0]}',
-            self.logger, self.logging_mutex)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            self.logger, self.logging_mutex
+            )
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def QC_output(input_files, output_files): # Stage 3d
             pass
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.subdivide(QC_output, # Stage 3d
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rpl.subdivide(
+            QC_output, # Stage 3d
             trimmomatic,
             ruffus.regex(r"trimm_[UP][12].fq.gz"),
             ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"])
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def phiX_extract(input_files, output_files, logger, logging_mutex): # Stage 3e
-            """
-            Remove PhiX reads
-            """
+            """ Remove PhiX reads
+                """
             try:
                 cmd = "fxtract -S -H -f %s -z -v %s > %s" %(input_files[1], input_files[0], output_files)
                 with logging_mutex:
@@ -461,21 +457,22 @@ class full_tm_pipeline:
                     logger.info("No phiX reads in the file: %s"%(input_files[0]))
                     logger.debug("phiX_extract: cmdline\n"+ cmd)
                 extern.run(cmd) 
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(task_func = phiX_extract, # Stage 3e
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rpl.transform(
+            task_func = phiX_extract, # Stage 3e
             input = QC_output,
             filter = ruffus.suffix(".fq.gz"), 
             add_inputs = ruffus.add_inputs(phiX_concat_ID), 
             output = "_phiX_ext.fq", 
-            extras = [self.logger, self.logging_mutex])
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            extras = [self.logger, self.logging_mutex]
+            )
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_4
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Third step in the QC process: remove rRNA, tRNA ...
         def sortmerna(input_files, output_files, ncRNA_files, logger, logging_mutex): # Stage 4
-            """
-            SortMeRNA. Remove non-coding RNA
-            """
+            """ SortMeRNA. Remove non-coding RNA
+                """
             cmd = "sortmerna --ref %s --reads %s --aligned %s --other %s --fastx -a %d --log" %( \
                     self.args.path_db_smr,
                     input_files,
@@ -486,23 +483,24 @@ class full_tm_pipeline:
                 logger.info("Remove reads with SortMeRNA in %(input_files)s"%locals())
                 logger.debug("sortmerna: cmdline\n"+ cmd)
             extern.run(cmd)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.subdivide(sortmerna, # Stage 4
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rpl.subdivide(
+            sortmerna, # Stage 4
             phiX_extract,
             ruffus.formatter(), 
             "{path[0]}/{basename[0]}_non_ncRNA.fq",
             "{path[0]}/{basename[0]}_ncRNA.fq",
-            self.logger, self.logging_mutex)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            self.logger, self.logging_mutex
+            )
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_5
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # mapping the reads to reference genome       
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def concat_for_mapping(input_files, output_files, ID_single, logger, logging_mutex): # Stage 5a
-            """
-            Prepare .fq files for the mapping stage
-            """
-            cmd_ID="comm -3 <(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s |sort) <(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s | sort) | awk  '{print $1 $2}' > %s" %(input_files[0], input_files[1],ID_single)            
+            """ Prepare .fq files for the mapping stage
+                """
+            cmd_ID = "comm -3 <(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s |sort) <(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s | sort) | awk  '{print $1 $2}' > %s" %(input_files[0], input_files[1],ID_single)            
 #            cmd_ID = "comm -3 <(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s |sort) " + \
 #                    "<(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s | sort) | awk  '{print $1 $2}' > %s"%(\
 #                    input_files[0], 
@@ -515,7 +513,7 @@ class full_tm_pipeline:
                     ID_single,
                     input_files[1],
                     output_files[1])                                                          
-            cmd_single = "cat %s %s > %s; fxtract -H -S -f '%s' %s %s >> %s" %( \
+            cmd_single = "cat %s %s > %s; fxtract -H -S -f '%s' %s %s >> %s" %(
                     input_files[2],
                     input_files[3],
                     output_files[2],
@@ -524,7 +522,7 @@ class full_tm_pipeline:
                     input_files[1],
                     output_files[2])
             with logging_mutex:
-                logger.info("Find IDs of single reads generated with SortMeRNA in (%s,%s)" %( \
+                logger.info("Find IDs of single reads generated with SortMeRNA in (%s,%s)" %(
                     input_files[0], input_files[1]))
                 logger.debug("concat_for_mapping: cmdline\n"+ cmd_ID)            
             #subprocess.check_call(['bash','-c',cmd_ID])
@@ -539,7 +537,6 @@ class full_tm_pipeline:
                 logger.debug("concat_for_mapping: cmdline\n"+ cmd_single)  
             subprocess.check_call(cmd_single, shell=True)
             #extern.run(cmd_single)
-        
             #  ~~~~ monitoring: count of reads  ~~~~ #     
             name_sample = self.prefix_pe[os.path.basename(output_files[0]).split('_concat_paired_R1.fq')[0]]            
             stat= Monitoring(self.tot_pe[name_sample])
@@ -548,23 +545,24 @@ class full_tm_pipeline:
             self.op_progress(
                 name_sample, 'remove ncRNA', 'SortMeRNA', 'filtered reads (1st)', 
                 str(non_ncRNA_reads), stat.get_tot_percentage(non_ncRNA_reads))
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.collate(concat_for_mapping, # Stage 5a
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rpl.collate(
+            concat_for_mapping, # Stage 5a
             sortmerna,
             ruffus.regex(r"trimm_.*"),
             ["concat_paired_R1.fq","concat_paired_R2.fq","concat_single.fq"],
             "ID_single.txt", 
-            self.logger, self.logging_mutex)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            self.logger, self.logging_mutex
+            )
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Map separately paired-end and singletons with 'BamM' and merge the results in one .bam file
         # WARNINGS
         #1. .bam files generated with 'BamM' only contain the mapped reads -> be carful with the interpretation of samtools flagstat
         #2. only one alignment per read is kept: the secondary and supplementary are removed
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def map2ref(input_files, output_file, bams, flagstat, logger, logging_mutex): # Stage 5b
-            """
-            BamM make. Map all metatranscriptomics reads against metagenomics contigs
-            """
+            """ BamM make. Map all metatranscriptomics reads against metagenomics contigs
+                """
             if self.has_index(input_files[1],['.amb','.bwt','.ann','.pac','.sa']):
                 # index already exists -> bamm Kept
                 index_exists='K'
@@ -591,7 +589,7 @@ class full_tm_pipeline:
                 logger.debug("map2ref: cmdline\n"+ cmd2)  
             extern.run(cmd2)
                 
-            cmd3= "samtools flagstat %s > %s " %(output_file,flagstat)
+            cmd3 = "samtools flagstat %s > %s " %(output_file,flagstat)
             with logging_mutex:     
                 logger.info("Compute statistics of %(output_file)s (samtools flastat)"%locals())
                 logger.debug("map2ref: cmdline\n"+ cmd3)  
@@ -605,8 +603,9 @@ class full_tm_pipeline:
             self.op_progress(
                 name_sample, 'alignment', 'BamM make', 'filtered reads (2nd)', 
                 str(mapped_reads), stat.get_tot_percentage(mapped_reads))
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(map2ref, # Stage 5b
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rpl.transform(
+            map2ref, # Stage 5b
             concat_for_mapping, 
             ruffus.formatter(r"(.+)/(?P<BASE>.*)_concat_paired_R1.fq"),
             ruffus.add_inputs(symlink_to_wd_metaG),
@@ -615,12 +614,12 @@ class full_tm_pipeline:
              "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[2]}.bam",
              "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+"{BASE[0]}_merged.bam"],
             "{path[0]}/{BASE[0]}_mapping.log",
-            self.logger, self.logging_mutex)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            self.logger, self.logging_mutex
+            )
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def mapping_filter(input_file, output_file, flagstat, logger, logging_mutex): # Stage 5c
-            """
-            BamM filter. Select reads which are mapped with high stringency
-            """
+            """ BamM filter. Select reads which are mapped with high stringency
+                """
             if self.args.no_mapping_filter :  
                 pass 
             else:
@@ -648,25 +647,26 @@ class full_tm_pipeline:
                 self.op_progress(
                     name_sample, '.bam filter', 'BamM filter', 'mapped reads', 
                     str(mapped_reads_f), stat.get_tot_percentage(mapped_reads_f))
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(mapping_filter, # Stage 5c
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rpl.transform(
+            mapping_filter, # Stage 5c
             map2ref,ruffus.formatter('.bam'), 
             "{path[0]}/{basename[0]}_filtered.bam", 
             "{path[0]}/{basename[0]}_stringency_filter.log", 
-            self.logger, self.logging_mutex)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            self.logger, self.logging_mutex
+            )
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_6 (normalized_cov)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # coverage if bins provided
-        if self.args.no_mapping_filter :  
+        if self.args.no_mapping_filter:  
             bam_file = map2ref 
         else: 
             bam_file= mapping_filter
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        def bam2normalized_cov(input_file, output_file, coverage_file, dir_bins,logger, logging_mutex): # Stage 6a
-            """
-            Dirseq (compute coverage values) +  coverage2normalized_cov
-            """
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        def bam2normalized_cov(input_file, output_file, coverage_file, dir_bins, logger, logging_mutex): # Stage 6a
+            """ Dirseq (compute coverage values) +  coverage2normalized_cov
+                """
             #                                                                       #
             ## add control! contigs in gff files must be present in metaG_contigs  ##
             #                   
@@ -674,7 +674,7 @@ class full_tm_pipeline:
             #f = open(lib_size_log, 'w')
             #f.write(str(lib_size)) 
             #f.close()                                                                #
-
+            #
             for i in range(len(self.list_gff)):
                 cmd = "dirseq --bam %s --gff %s --ignore-directions -q>  %s "%(\
                         input_file, self.list_gff[i], coverage_file)
@@ -693,7 +693,7 @@ class full_tm_pipeline:
                             os.path.splitext(os.path.basename((self.list_gff[i])))[0]+'_normalized_cov.csv',
                         coverage_file)
                 else:
-                    cmd1 = "cp %s %s; rm %s "%( \
+                    cmd1 = "cp %s %s; rm %s "%(
                         coverage_file,
                         input_file.split('.bam')[0]+'_'+ 
                             os.path.splitext(os.path.basename((self.list_gff[i])))[0]+'_normalized_cov.csv',
@@ -703,28 +703,29 @@ class full_tm_pipeline:
                     logger.info("Convert coverage to normalized_cov")
                     logger.debug("bam2normalized_cov: cmdline\n" + cmd1)
                 extern.run(cmd1)                
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.subdivide(bam2normalized_cov, # Stage 6a
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rpl.subdivide(
+            bam2normalized_cov, # Stage 6a
             bam_file, 
             ruffus.formatter(),
             '{path[0]}/*normalized_cov.csv',
             '{path[0]}/coverage.csv',
             self.args.dir_bins,
-            self.logger, self.logging_mutex)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            self.logger, self.logging_mutex
+            )
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_6 BIS (raw count)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # raw count if bins provided
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if self.args.no_mapping_filter :  
             bam_file = map2ref 
         else: 
             bam_file= mapping_filter
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def bam2raw_count(input_file, output_file, list_gff,logger, logging_mutex): # Stage 6b  
-            """
-            Bedtools (count the number of mapped reads per gene)
-            """                                                            #
+            """ Bedtools (count the number of mapped reads per gene)
+                """
             for i in range(len(self.list_gff)):
                 gff_no_fasta= tempfile.NamedTemporaryFile(prefix='transcriptm', suffix='.gff')
                 cmd0 = "sed '/^##FASTA$/,$d' %s > %s" %(self.list_gff[i], gff_no_fasta.name)
@@ -738,20 +739,21 @@ class full_tm_pipeline:
                     logger.info("Calculate raw count from %s and %s "%(input_file, gff_no_fasta.name))  
                     logger.debug("bam2raw_count: cmdline\n"+ cmd)                                       
                 extern.run(cmd)        
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.subdivide(bam2raw_count, # Stage 6b
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rpl.subdivide(
+            bam2raw_count, # Stage 6b
             bam_file,ruffus.formatter(),
             '{path[0]}/*count.csv',
             self.list_gff,
-            self.logger, self.logging_mutex)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            self.logger, self.logging_mutex
+            )
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_7 (normalized_cov table)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Concatenate all the normalized_cov results in a table
         def transcriptM_table (input_files, output_file, logger, logging_mutex): # Stage 7a
-            """
-            Create one table that contains RPKM values for each gene of each bin for the different samples
-            """
+            """ Create one table that contains RPKM values for each gene of each bin for the different samples.
+                """
             input_files=list(set(input_files))      
             if len(input_files)==0: 
                 raise Exception("Incorrect input detected. Likely causes: " + \
@@ -805,20 +807,21 @@ class full_tm_pipeline:
             with logging_mutex:     
                 logger.info("Create table that contains normalized_cov values for each gene of each bin given " + \
                     "as input for the different samples: %s" %(','.join(self.prefix_pe.values())))    
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.merge(transcriptM_table, # Stage 7a
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rpl.merge(
+            transcriptM_table, # Stage 7a
             bam2normalized_cov, 
             os.path.join(self.args.output_dir,os.path.basename(self.args.output_dir)+'_NORM_COVERAGE.csv'),
-            self.logger, self.logging_mutex)\
+            self.logger, self.logging_mutex
+            )\
         .mkdir(self.args.output_dir)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_7 BIS (raw count table)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Concatenate all the raw count in a table
         def raw_count_table (input_files, output_file, logger, logging_mutex): # Stage 7b
-            """
-            Create one table that contains raw count values for each gene of each bin for the different samples
-            """
+            """ Create one table that contains raw count values for each gene of each bin for the different samples
+                """
             input_files=list(set(input_files))          
             count_col= [list([]) for _ in xrange(int(len(self.args.paired_end)/2)+3)]       
             # headers of cols ->  0, n-1, n
@@ -868,28 +871,29 @@ class full_tm_pipeline:
             with logging_mutex:     
                 logger.info("Create table that contains raw count values for each gene of each bin given as input " + \
                     "for the different samples: %s"%(','.join(self.prefix_pe.values())))    
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.merge(raw_count_table, # Stage 7b
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rpl.merge(
+            raw_count_table, # Stage 7b
             bam2raw_count,
             os.path.join(self.args.output_dir,os.path.basename(self.args.output_dir)+'_COUNT.csv'),
-            self.logger, self.logging_mutex)\
+            self.logger, self.logging_mutex
+            )\
         .mkdir(self.args.output_dir)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: TRACE FILE N_1
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Create the first output: a fastqc report of raw DATA
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         subdir_1 = os.path.join(self.args.output_dir, "FastQC_raw")
         # clean the dir (of previous run output)
         try:
             shutil.rmtree(subdir_1)
         except OSError:
             pass          
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def view_raw_data(input_file, soft_link_name, logger, logging_mutex): # Stage T1a
-            """
-            Create a fastQC report in the ouptut directory
-            """
+            """ Create a fastQC report in the ouptut directory
+                """
             cmd = "fastqc %s -o %s --threads %d --quiet; rm %s/*.zip" % \
                 (input_file,
                 subdir_1, 
@@ -899,31 +903,32 @@ class full_tm_pipeline:
                 logger.info("Create a fastqc report of raw %(input_file)s" % locals())
                 logger.debug("view_raw_data: cmdline\n"+cmd)
             extern.run(cmd)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(view_raw_data, # Stage T1a
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rpl.transform(
+            view_raw_data, # Stage T1a
             symlink_to_wd_metaT, 
             ruffus.formatter(),
             # move to output directory
             os.path.join(subdir_1,"{basename[0]}"+"_fastqc.zip"),
-            self.logger, self.logging_mutex)\
+            self.logger, self.logging_mutex
+            )\
         .mkdir(subdir_1)\
         .follows(bam2normalized_cov)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: TRACE FILE N_2
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Create the second output: a fastqc report of processed DATA
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         subdir_2 = os.path.join(self.args.output_dir, "FastQC_processed")
         # clean the dir (of previous run output)
         try:
             shutil.rmtree(subdir_2)
         except OSError:
             pass          
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def view_processed_data (input_file, soft_link_name, logger, logging_mutex): # Stage T2a
-            """
-            Create a fastQC report in the ouptut directory
-            """
+            """ Create a fastQC report in the ouptut directory
+                """
             cmd = "fastqc %s -o %s --threads %d --quiet; rm %s/*.zip" %(
                     ' '.join(input_file),
                     subdir_2, 
@@ -934,52 +939,54 @@ class full_tm_pipeline:
                 logger.info("Create a fastqc report of processed %(input_file)s" % locals())
                 logger.debug("view_processed_data: cmdline\n"+cmd)
             extern.run(cmd)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(view_processed_data, # Stage T2a
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rpl.transform(
+            view_processed_data, # Stage T2a
             trimmomatic, 
             ruffus.formatter(),
             # move to output directory
             os.path.join(subdir_2,"{basename[0]}"+"_fastqc.zip"),
-            self.logger, self.logging_mutex)\
+            self.logger, self.logging_mutex
+            )\
         .mkdir(subdir_2)\
         .follows(bam2normalized_cov)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE:TRACE FILE N_3
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # get monitoring data
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         subdir_3 = os.path.join(self.args.output_dir,"log/")
         # clean the dir (of previous run output)
         try:
             shutil.rmtree(subdir_3)
         except OSError:
             pass        
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def save_log(input_files, output_files, logger, logging_mutex): # Stage T3a
-            """
-            Save the log files, generated for different stages of the pipeline (in the temp directory)
-            """
+            """ Save the log files, generated for different stages of the pipeline (in the temp directory).
+                """
             cmd= "cp %s %s"   %(input_files, output_files)    
             with logging_mutex:
                 logger.info("Save log files: %(input_files)s" % locals())
                 logger.debug("save_log: cmdline\n"+cmd)                
             extern.run(cmd)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(save_log, # Stage T3a
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rpl.transform(
+            save_log, # Stage T3a
             self.args.working_dir+'/*.log', 
             ruffus.formatter(".log"),  
             os.path.join(subdir_3,
             "{basename[0]}"+".log"),
-            self.logger, self.logging_mutex)\
+            self.logger, self.logging_mutex
+            )\
         .mkdir(subdir_3)\
         .follows(bam2normalized_cov)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         subdir_4 = os.path.join(self.args.output_dir, "reads_distribution") 
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def logtable(input_files, output_file, basename): # Stage T4a
-            """
-            Sums up the count of reads which are kept after each step 
-            """
+            """ Sums up the count of reads which are kept after each step.
+                """
             name_sample = self.prefix_pe[basename]
             stat = Monitoring(self.tot_pe[name_sample])          
             # raw
@@ -1022,18 +1029,19 @@ class full_tm_pipeline:
                       map(str,stat.get_all_tot_percentage()) ,
                       map(str,stat.get_all_percentage_prev())])
                 numpy.savetxt(output_file,numpy.transpose(tab),delimiter='\t', fmt="%s") 
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.collate(logtable, # Stage T4a  
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rpl.collate(
+            logtable, # Stage T4a  
             save_log, 
             ruffus.formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|" + \
                 "(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
-            subdir_4+"/{BASE[0]}_reads_stat",'{BASE[0]}')\
+            subdir_4+"/{BASE[0]}_reads_stat",'{BASE[0]}'
+            )\
         .mkdir(subdir_4)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def concatenate_logtables(input_files, output_file, logger, logging_mutex): # Stage T4b
-            """
-            Concatenate the summuries of reads distribution from all samples
-            """
+            """ Concatenate the summuries of reads distribution from all samples.
+                """
             input_files = (' ').join(input_files)
             h= ["sample name","step name","tool used","input data","reads count","% total","% previous step"]  
             header= ('\t').join(h)            
@@ -1042,57 +1050,59 @@ class full_tm_pipeline:
                 logger.info("Concatenate summaries: %(input_files)s" % locals())
                 logger.debug("concatenate_logtables: cmdline\n"+cmd)                
             extern.run(cmd)  
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.merge(concatenate_logtables, # Stage T4b
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rpl.merge(
+            concatenate_logtables, # Stage T4b
             logtable, 
             os.path.join(self.args.output_dir, 'summary_reads'), 
-            self.logger, self.logging_mutex)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            self.logger, self.logging_mutex
+            )
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE:TRACE FILE N_4
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # save the processed metaT reads
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         subdir_4 = os.path.join(self.args.output_dir, "processed_reads/")
         # clean the dir (of previous run output)
         try:
             shutil.rmtree(subdir_4)
         except OSError:
             pass  
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def save_processed_reads(input_file, output_file, logger, logging_mutex): # Stage T4c
-            """
-            Copy the processed reads in the ouptut directory
-            """
+            """ Copy the processed reads in the ouptut directory.
+                """
             for i in range(3):
-                cmd = "cp %s %s " %(input_file[i],output_file[i] )
-
+                cmd = "cp %s %s " %(input_file[i], output_file[i])
                 with logging_mutex:
                     logger.info("Copy the processed reads %s in the ouptut directory" %(input_file[i]))
-                    logger.debug("save_processed_reads: cmdline\n"+cmd)
+                    logger.debug("save_processed_reads: cmdline\n" + cmd)
                 extern.run(cmd)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(save_processed_reads, # Stage T4c
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rpl.transform(
+            save_processed_reads, # Stage T4c
             concat_for_mapping, ruffus.formatter(),
             # move to output directory
             [os.path.join(subdir_4,"{basename[0]}{ext[0]}"),
             os.path.join(subdir_4,"{basename[1]}{ext[1]}"),
             os.path.join(subdir_4,"{basename[2]}{ext[2]}")],
-            self.logger, self.logging_mutex)\
+            self.logger, self.logging_mutex
+            )\
         .mkdir(subdir_4)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: RUN
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         #for task in ruffus.pipeline_get_task_names():
         #    print task
         ruffus.cmdline.run(self.args)
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # CLEAR FUNCTION:
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def clear(self):
         """ tidy-up of the program's output directory, (renames certain files, and deletes a subdirectory),
             intended to be performed after the pipeline stages have been run.
             """
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def rename_output_files_original_name():
             """ renames all files in output directories with their 'real name'. (???)
                 """
@@ -1108,7 +1118,7 @@ class full_tm_pipeline:
                         # by the first part of `self.prefix_pe`, i.e. up to the first "_". 
                         string.replace(f, f.split('_')[0], self.prefix_pe[f.split('_')[0]]))
                     os.rename(f_oldname, f_newname)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def remove_reads_distribution_dir():
             ''' removes the "reads_distribution" subdirectory of the program's output directory.
                 '''
@@ -1116,7 +1126,7 @@ class full_tm_pipeline:
                 shutil.rmtree(os.path.join(self.args.output_dir, "reads_distribution/"))
             except OSError:
                 pass
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rename_output_files_original_name()
         remove_reads_distribution_dir()
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

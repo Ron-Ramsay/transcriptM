@@ -26,7 +26,8 @@
 # 26: Rename main_pl to rpl (ruffus pipeline)."
 # 27: Reduced code width to 121 characters (visible in Github, half screen)."
 # 28: transform(save_processed_reads, # Stage T4c ... .follows(mkdir(subdir_4))."
-print "29: more .follows(mkdir("
+# 29: more .follows(mkdir("
+print "30: collate(logtable, # Stage T4a"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -46,8 +47,8 @@ import shutil        # high-level file operations.
 import extern        # version of Python's `subprocess`. See https://pypi.python.org/pypi/extern/0.1.0
 import numpy         # array processing for numbers, strings, records, objects. See http://www.numpy.org/
 import ruffus        # light-weight computational pipeline management. See http://www.ruffus.org.uk
-#RKR: Remove theses once ruffus decorators are gone.
-from ruffus import collate, follows, merge, originate, transform ### subdivide # ruffus decorators.
+#RKR: Remove these once ruffus decorators are gone.
+from ruffus import collate, follows, originate, transform ### merge, subdivide  # ruffus decorators.
 # from ruffus import regex, formatter, add_inputs, suffix                 # ruffus filter / indicators.
 from ruffus import active_if, mkdir                                          # ruffus other.
 
@@ -67,7 +68,7 @@ class full_tm_pipeline:
         """ (routines automatically executed upon instantiation of an instance of this class).
             """
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        def presto_ref_genome_phiX():
+        def V_ref_genome_phiX():
             """ instantiates and validates `self.ref_genome_phiX`: the filepath of the reference genome file (PhiX).
                 """
             self.ref_genome_phiX = os.path.join(self.args.db_path, '2-PhiX/phiX.fa')
@@ -76,7 +77,7 @@ class full_tm_pipeline:
                                 %(os.path.basename(self.ref_genome_phiX), self.args.db_path))
                 exit(1)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        def presto_list_gff():
+        def V_list_gff():
             """ instantiates and validates `self.list_gff`: the list of gff files.
                 """
             self.list_gff = list(numpy.sort(self.get_files(self.args.dir_bins , '.gff')))
@@ -84,7 +85,7 @@ class full_tm_pipeline:
                 raise Exception ("--dir_bins args \nWarning: some gff files have the same name")
                 exit(1)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        def presto_alias_pe():
+        def V_alias_pe():
             """ populates dictionary `self.alias_pe`: 
                 index: original filenames (of metatranscriptomic reads), as listed in argument `paired_end`.
                 value: matching working directory filenames (but these filenames will not yet be created).
@@ -99,7 +100,7 @@ class full_tm_pipeline:
                 self.alias_pe[os.path.join(self.args.working_dir, 'sample-'+str(i)+'_R2.fq.gz')] = \
                     self.args.paired_end[2*i+1]
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        def presto_prefix_pe():
+        def V_prefix_pe():
             """ populates dictionary `self.prefix_pe`:
                 index: "sample-n", where 'n' is the zero-based counter for each *pair* of filenames passed in `paired_end`. 
                 value: descriptor of the longest common substring (trimmed of some types of trailing characters) for the pair of filenames.
@@ -125,7 +126,7 @@ class full_tm_pipeline:
                 raise Exception ("2 sets of paired-ends files have the same prefix. Rename one set. \n")
                 exit(1)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        def presto_tot_pe():
+        def V_tot_pe():
             """ populates dictionary `self.tot_pe`:
                 index: descriptor of the longest common substring (trimmed of some types of trailing characters) 
                     for the pair of filenames;
@@ -154,12 +155,12 @@ class full_tm_pipeline:
         ''' function control: '''
         # Store arguments passed.
         self.args = args             
-        # Generate and validate derived argments...
-        presto_ref_genome_phiX()
-        presto_list_gff()
-        presto_alias_pe()
-        presto_prefix_pe()
-        presto_tot_pe()
+        # Generate and Validate derived argments...
+        V_ref_genome_phiX()
+        V_list_gff()
+        V_alias_pe()
+        V_prefix_pe()
+        V_tot_pe()
         # Set up logging.
         setup_logging()              
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -374,7 +375,7 @@ class full_tm_pipeline:
 #        @subdivide(trimmomatic,formatter(r"(.+)/(?P<BASE>.*)P1.fq.gz"),["{path[0]}/phiX.{BASE[0]}P1.bam",
 #                                                                        "{path[0]}/phiX.{BASE[0]}U1.bam",
 #                                                                        "{path[0]}/phiX.{BASE[0]}U2.bam"], self.logger, self.logging_mutex)
-        def phiX_map (input_files, output_files, logger, logging_mutex):
+        def phiX_map(input_files, output_files, logger, logging_mutex):
             """
             BamM make. Map all reads against PhiX genome
             """
@@ -613,7 +614,7 @@ class full_tm_pipeline:
 #                    "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[2]}.bam",
 #                    "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+"{BASE[0]}_merged.bam"],
 #                    "{path[0]}/{BASE[0]}_mapping.log",self.logger, self.logging_mutex)
-        def map2ref (input_files, output_file, bams, flagstat, logger, logging_mutex):
+        def map2ref(input_files, output_file, bams, flagstat, logger, logging_mutex):
             """
             BamM make. Map all metatranscriptomics reads against metagenomics contigs
             """
@@ -969,7 +970,7 @@ class full_tm_pipeline:
                         # move to output directory
                         os.path.join(subdir_1,"{basename[0]}"+"_fastqc.zip"),
                         self.logger, self.logging_mutex)
-        def view_raw_data (input_file, soft_link_name, logger, logging_mutex):
+        def view_raw_data(input_file, soft_link_name, logger, logging_mutex): # Stage T1a
             """
             Create a fastQC report in the ouptut directory
             """
@@ -1002,7 +1003,7 @@ class full_tm_pipeline:
                         # move to output directory
                         os.path.join(subdir_2,"{basename[0]}"+"_fastqc.zip"),
                         self.logger, self.logging_mutex)
-        def view_processed_data (input_file, soft_link_name, logger, logging_mutex):
+        def view_processed_data (input_file, soft_link_name, logger, logging_mutex): # Stage T2a
             """
             Create a fastQC report in the ouptut directory
             """
@@ -1036,7 +1037,7 @@ class full_tm_pipeline:
                    os.path.join(subdir_3,
                    "{basename[0]}"+".log"),
                    self.logger, self.logging_mutex)
-        def save_log(input_files, output_files, logger, logging_mutex):
+        def save_log(input_files, output_files, logger, logging_mutex): # Stage T3a
             """
             Save the log files, generated for different stages of the pipeline (in the temp directory)
             """
@@ -1050,11 +1051,11 @@ class full_tm_pipeline:
         subdir_4 = os.path.join(self.args.output_dir, "reads_distribution") 
         
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        @mkdir(subdir_4)
-        @collate(save_log, 
-            ruffus.formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|" + \
-                "(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
-            subdir_4+"/{BASE[0]}_reads_stat",'{BASE[0]}')
+#        @mkdir(subdir_4)
+#        @collate(save_log, 
+#            ruffus.formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|" + \
+#                "(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
+#            subdir_4+"/{BASE[0]}_reads_stat",'{BASE[0]}')
         def logtable(input_files, output_file, basename): # Stage T4a
             """
             Sums up the count of reads which are kept after each step 
@@ -1108,11 +1109,17 @@ class full_tm_pipeline:
 #                "(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
 #            subdir_4+"/{BASE[0]}_reads_stat",'{BASE[0]}')\
 #        .follows(mkdir(subdir_4))
+        
+        rpl.collate(logtable, # Stage T4a  
+            save_log, 
+            ruffus.formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|" + \
+                "(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
+            subdir_4+"/{BASE[0]}_reads_stat",'{BASE[0]}')\
+        .follows(mkdir(subdir_4))
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # Stage T4b
 #        @merge(logtable, os.path.join(self.args.output_dir, 'summary_reads'), self.logger, self.logging_mutex)
-        def concatenate_logtables(input_files, output_file, logger, logging_mutex):
+        def concatenate_logtables(input_files, output_file, logger, logging_mutex): # Stage T4b
             """
             Concatenate the summuries of reads distribution from all samples
             """
@@ -1142,7 +1149,6 @@ class full_tm_pipeline:
         except OSError:
             pass  
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # Stage T4c
 #        @mkdir(subdir_4)
 #        @transform(concat_for_mapping, ruffus.formatter(),
 #                        # move to output directory
@@ -1150,7 +1156,7 @@ class full_tm_pipeline:
 #                        os.path.join(subdir_4,"{basename[1]}{ext[1]}"),
 #                        os.path.join(subdir_4,"{basename[2]}{ext[2]}")],
 #                        self.logger, self.logging_mutex)
-        def save_processed_reads(input_file, output_file, logger, logging_mutex):
+        def save_processed_reads(input_file, output_file, logger, logging_mutex): # Stage T4c
             """
             Copy the processed reads in the ouptut directory
             """

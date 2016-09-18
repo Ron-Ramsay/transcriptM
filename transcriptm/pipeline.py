@@ -20,7 +20,8 @@
 # 38: use of self.SUBDIR_ constants in clear function."  
 # 39: use of self.SUBDIR_ constants to replace all subdir_ variables."  
 # 40: use of self.SUBDIR_ constants to erase dirs at the start in one place." 
-print "41: ruffus.cmdline.run(self.args, target_tasks =. Also multiprocess = 5)" 
+# 41: ruffus.cmdline.run(self.args, target_tasks =. Also tried multiprocess = 5 which failed)" 
+print "42: ." 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -72,12 +73,13 @@ class full_tm_pipeline:
                 exit(1)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_alias_pe():
-            """ populates dictionary `self.alias_pe`: 
-                index: original filenames (of metatranscriptomic reads), as listed in argument `paired_end`.
-                value: matching working directory filenames (but these filenames will not yet be created).
+            """ populates dict `self.alias_pe` of aliases symbolically linked filenames to the paired-end reads.
+                key: working directory filenames (but these files will not yet be created).
                        format: `sample-n_R1.fq.gz`, `sample-n_R2.fq.gz`, 
                        where 'n' is a zero-based counter for each pair of filenames. 
-                e.g. {'/srv/home/s4293029/tm_working/sample-0_R1.fq.gz': '/srv/home/s4293029/tm_data/20120800_P2M.1.fq.gz', ...}
+                value: original filenames (of metatranscriptomic reads), as listed in argument `paired_end`.
+                e.g. {'/srv/home/s4293029/tm_working/sample-0_R1.fq.gz': 
+                        '/srv/home/s4293029/tm_data/20120800_P2M.1.fq.gz', ...}
                 """
             self.alias_pe = {}  
             for i in range(int(len(self.args.paired_end)/2)): # Loop an index through the pairs in the `paired_end` list.
@@ -85,6 +87,9 @@ class full_tm_pipeline:
                     self.args.paired_end[2*i]
                 self.alias_pe[os.path.join(self.args.working_dir, 'sample-'+str(i)+'_R2.fq.gz')] = \
                     self.args.paired_end[2*i+1]
+#            print "Debug: self.alias_pe:", self.alias_pe
+#            {'/srv/home/s4293029/tm_working/sample-0_R1.fq.gz': '/srv/home/s4293029/tm_data/20120800_P2M.1.fq.gz', 
+#            '/srv/home/s4293029/tm_working/sample-0_R2.fq.gz': '/srv/home/s4293029/tm_data/20120800_P2M.2.fq.gz'}
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_prefix_pe():
             """ populates dictionary `self.prefix_pe`:
@@ -262,25 +267,21 @@ class full_tm_pipeline:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_1
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        def symlink_to_wd_metaT (soft_link_name, logger, logging_mutex): # Stage 1a
-            """ Make soft link in working directory.
-                """
+        def symlink_to_wd_metaT(soft_link_name, logger, logging_mutex): # Stage 1a
+            """ Make soft link in working directory. """
             input_file = self.alias_pe[soft_link_name]
             with logging_mutex:
                 logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
             self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def symlink_to_wd_metaG (input_file, soft_link_name, logger, logging_mutex): # Stage 1b
-            """ Make soft link in working directory. 
-                """
+            """ Make soft link in working directory. """
             with logging_mutex:
                 logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
             self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # check if bwa index are present 
         def symlink_to_wd_metaG_index(input_file, soft_link_name, logger, logging_mutex): # Stage 1c
-            """ Make soft link in working directory
-                """
+            """ Make soft link in working directory. Intended to be used when bwa indexes are present. """
             with logging_mutex:
                 logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
             self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
@@ -474,12 +475,12 @@ class full_tm_pipeline:
         def map2ref(input_files, output_file, bams, flagstat, logger, logging_mutex): # Stage 5b
             """ BamM make. Map all metatranscriptomics reads against metagenomics contigs
                 """
-            if self.has_index(input_files[1],['.amb','.bwt','.ann','.pac','.sa']):
+            if self.has_index(input_files[1], ['.amb','.bwt','.ann','.pac','.sa']):
                 # index already exists -> bamm Kept
-                index_exists='K'
+                index_exists = 'K'
             else:
                 # index doesn't exist yet -> bamm keep        
-                index_exists='k'
+                index_exists = 'k'
             cmd = "bamm make -d %s -c %s %s -s %s -o %s --threads %d -%s --quiet"%(
                     input_files[1],
                     input_files[0][0],
@@ -716,8 +717,7 @@ class full_tm_pipeline:
                     "for the different samples: %s"%(','.join(self.prefix_pe.values())))    
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def view_raw_data(input_file, soft_link_name, logger, logging_mutex): # Stage T1a
-            """ Create a fastQC report in the output directory
-                """
+            """ generates a FastQC report for the raw data. """
             cmd = "fastqc %s -o %s --threads %d --quiet; rm %s/*.zip" %(
                 input_file,
                 self.SUBDIR_FastQC_raw, ###! IMPROVE: Consider passing as function parameter.
@@ -822,43 +822,41 @@ class full_tm_pipeline:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl = ruffus.Pipeline.pipelines["main"] # "rpl: 'Ruffus PipeLine'."
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        ''' coverage if bins provided:
-            This flag:
+        ''' flag `args.no_mapping_filter`:
                 (a) determines whether mapping_filter() is performed (to transform the results of map2ref()).
                         (At the moment, mapping_filter() is still entered into, 
                          but the flag is checked again inside the function so that nothing is performed.)
                 (b) determines whether the inputs for bam2raw_count() and bam2normalized_cov() are taken directly 
                     from map2ref() or whether they are taken from the subsequent mapping_filter().
-            '''        
+            '''
         if self.args.no_mapping_filter:  
             bam_file = map2ref 
         else: 
             bam_file= mapping_filter
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.originate(symlink_to_wd_metaT, # Stage 1a
-            self.alias_pe.keys(), 
-            self.logger, self.logging_mutex
+        rpl.originate(task_func = symlink_to_wd_metaT, # Stage 1a
+            output = self.alias_pe.keys(), # soft-link filenames of metatranscriptomic paired-end reads.
+            extras = [self.logger, self.logging_mutex]
             )\
         .mkdir(self.args.working_dir)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(symlink_to_wd_metaG, #Stage 1b
-            self.args.metaG_contigs, 
-            ruffus.formatter(),
-            # move to working directory
-            os.path.join(self.args.working_dir,"{basename[0]}"+".fa"),
-            self.logger, self.logging_mutex
+        rpl.transform(task_func = symlink_to_wd_metaG, # Stage 1b
+            input = self.args.metaG_contigs, # filename of all contigs from the reference metagenome (in a fasta file).
+            filter = ruffus.formatter(), 
+            output = os.path.join(self.args.working_dir, "{basename[0]}"+".fa"), # put in working directory.
+            extras = [self.logger, self.logging_mutex]
             )\
         .mkdir(self.args.working_dir)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(symlink_to_wd_metaG_index, # Stage 1c
-            [self.args.metaG_contigs+x for x in ['.amb','.bwt','.ann','.pac','.sa']], 
-            ruffus.formatter(),
-            # move to working directory
-            os.path.join(self.args.working_dir,"{basename[0]}{ext[0]}"),
-            self.logger, self.logging_mutex
+        rpl.transform(task_func = symlink_to_wd_metaG_index, # Stage 1c
+            input = [self.args.metaG_contigs+x for x in ['.amb','.bwt','.ann','.pac','.sa']], 
+            filter = ruffus.formatter(),
+            output = os.path.join(self.args.working_dir,"{basename[0]}{ext[0]}"), # put in working directory.
+            extras = [self.logger, self.logging_mutex]
             )\
         .mkdir(self.args.working_dir)\
-        .active_if(self.has_index(self.args.metaG_contigs,['.amb','.bwt','.ann','.pac','.sa']))
+        .active_if(self.has_index(self.args.metaG_contigs, ['.amb','.bwt','.ann','.pac','.sa']))
+            # Intended to be used when bwa indexes are present.
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl.collate(trimmomatic, # Stage 2a
             symlink_to_wd_metaT,
@@ -881,9 +879,7 @@ class full_tm_pipeline:
             input = phiX_map,
             filter = ruffus.suffix(".bam"),
             output = ".txt",
-            extras = [
-                self.logger,
-                self.logging_mutex]
+            extras = [self.logger, self.logging_mutex]
             )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl.collate(phiX_concat_ID, # Stage 3c
@@ -922,23 +918,41 @@ class full_tm_pipeline:
             self.logger, self.logging_mutex
             )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(map2ref, # Stage 5b
-            concat_for_mapping, 
-            ruffus.formatter(r"(.+)/(?P<BASE>.*)_concat_paired_R1.fq"),
-            ruffus.add_inputs(symlink_to_wd_metaG),
-            "{path[0]}/{BASE[0]}.bam",
-            ["{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[0]}.bam",
-             "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[2]}.bam",
-             "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+"{BASE[0]}_merged.bam"],
-            "{path[0]}/{BASE[0]}_mapping.log",
-            self.logger, self.logging_mutex
-            )
+#        rpl.transform(map2ref, # Stage 5b
+#            concat_for_mapping, 
+#            ruffus.formatter(r"(.+)/(?P<BASE>.*)_concat_paired_R1.fq"),
+#            ruffus.add_inputs(symlink_to_wd_metaG),
+#            "{path[0]}/{BASE[0]}.bam",
+#            ["{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[0]}.bam",
+#             "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[2]}.bam",
+#             "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+"{BASE[0]}_merged.bam"],
+#            "{path[0]}/{BASE[0]}_mapping.log",
+#            self.logger, self.logging_mutex
+#            )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(mapping_filter, # Stage 5c
-            map2ref,ruffus.formatter('.bam'), 
-            "{path[0]}/{basename[0]}_filtered.bam", 
-            "{path[0]}/{basename[0]}_stringency_filter.log", 
-            self.logger, self.logging_mutex
+        rpl.transform(task_func = map2ref, # Stage 5b
+            input = concat_for_mapping, 
+            filter = ruffus.formatter(r"(.+)/(?P<BASE>.*)_concat_paired_R1.fq"),
+            add_inputs = ruffus.add_inputs(symlink_to_wd_metaG),
+            output = "{path[0]}/{BASE[0]}.bam",
+            extras = [
+                ["{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[0]}.bam",
+                 "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[2]}.bam",
+                 "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+"{BASE[0]}_merged.bam"],
+                "{path[0]}/{BASE[0]}_mapping.log",
+                self.logger, 
+                self.logging_mutex]
+            )\
+        .follows(symlink_to_wd_metaG_index) # This dependency has been added since v0.3.
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        rpl.transform(task_func = mapping_filter, # Stage 5c
+            input = map2ref,
+            filter = ruffus.formatter('.bam'),
+            output = "{path[0]}/{basename[0]}_filtered.bam", 
+            extras = [
+                "{path[0]}/{basename[0]}_stringency_filter.log", 
+                self.logger,  
+                self.logging_mutex]
             )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl.subdivide(bam2normalized_cov, # Stage 6a
@@ -971,22 +985,20 @@ class full_tm_pipeline:
             )\
         .mkdir(self.args.output_dir)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(view_raw_data, # Stage T1a # Create the first output: a fastqc report of raw DATA
-            symlink_to_wd_metaT, 
-            ruffus.formatter(),
-            # move to output directory
-            os.path.join(self.SUBDIR_FastQC_raw, "{basename[0]}"+"_fastqc.zip"),
-            self.logger, self.logging_mutex
+        rpl.transform(task_func = view_raw_data, # Stage T1a # Create the first output: a fastqc report of raw DATA
+            input = symlink_to_wd_metaT, 
+            filter = ruffus.formatter(),
+            output = os.path.join(self.SUBDIR_FastQC_raw, "{basename[0]}"+"_fastqc.zip"),
+            extras = [self.logger, self.logging_mutex]
             )\
         .mkdir(self.SUBDIR_FastQC_raw)\
         .follows(bam2normalized_cov)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(view_processed_data, # Stage T2a
-            trimmomatic, 
-            ruffus.formatter(),
-            # move to output directory
-            os.path.join(self.SUBDIR_FastQC_processed,"{basename[0]}"+"_fastqc.zip"),
-            self.logger, self.logging_mutex
+        rpl.transform(task_func = view_processed_data, # Stage T2a
+            input = trimmomatic, 
+            filter = ruffus.formatter(),
+            output = os.path.join(self.SUBDIR_FastQC_processed,"{basename[0]}"+"_fastqc.zip"),
+            extras = [self.logger, self.logging_mutex]
             )\
         .mkdir(self.SUBDIR_FastQC_processed)\
         .follows(bam2normalized_cov)
@@ -1001,11 +1013,11 @@ class full_tm_pipeline:
             )\
         .mkdir(self.SUBDIR_reads_distribution)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(save_log, # Stage T3a
-            self.args.working_dir+'/*.log', 
-            ruffus.formatter(".log"),  
-            os.path.join(self.SUBDIR_log, "{basename[0]}"+".log"),
-            self.logger, self.logging_mutex
+        rpl.transform(task_func = save_log, # Stage T3a
+            input = self.args.working_dir+'/*.log', 
+            filter = ruffus.formatter(".log"),  
+            output = os.path.join(self.SUBDIR_log, "{basename[0]}"+".log"),
+            extras = [self.logger, self.logging_mutex]
             )\
         .mkdir(self.SUBDIR_log)\
         .follows(bam2normalized_cov)
@@ -1016,14 +1028,14 @@ class full_tm_pipeline:
             self.logger, self.logging_mutex
             )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(save_processed_reads, # Stage T4c
-            concat_for_mapping, 
-            ruffus.formatter(),
-            # move to output directory
-            [os.path.join(self.SUBDIR_processed_reads, "{basename[0]}{ext[0]}"),
-            os.path.join(self.SUBDIR_processed_reads, "{basename[1]}{ext[1]}"),
-            os.path.join(self.SUBDIR_processed_reads, "{basename[2]}{ext[2]}")],
-            self.logger, self.logging_mutex
+        rpl.transform(task_func = save_processed_reads, # Stage T4c
+            input = concat_for_mapping, 
+            filter = ruffus.formatter(),
+            output = [
+                os.path.join(self.SUBDIR_processed_reads, "{basename[0]}{ext[0]}"),
+                os.path.join(self.SUBDIR_processed_reads, "{basename[1]}{ext[1]}"),
+                os.path.join(self.SUBDIR_processed_reads, "{basename[2]}{ext[2]}")],
+            extras = [self.logger, self.logging_mutex]
             )\
         .mkdir(self.SUBDIR_processed_reads)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1036,6 +1048,8 @@ class full_tm_pipeline:
         #rpl.run(target_tasks = [trimmomatic])
         #rpl.run(target_tasks = view_processed_data,  verbose = 1) # verbose = 0
         rpl.run(verbose = 0) # verbose = 0 defaults to 1
+        #rpl.run(target_tasks = [symlink_to_wd_metaG], verbose = 0) # verbose = 0 defaults to 1
+        #multithread = 3
         #multiprocess = 5)
         #ruffus.cmdline.run(target_tasks = [trimmomatic])
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

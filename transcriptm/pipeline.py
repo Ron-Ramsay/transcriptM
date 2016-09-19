@@ -23,7 +23,8 @@
 # 42: ." 
 # 43: run target_tasks." 
 # 44: removed ruffus.follows dependency from view_raw_data and view_processed_data." 
-print "45: naming arguments to ruffus functions. Implementing end_stages." 
+# 45: naming arguments to ruffus functions. Implementing end_stages." 
+print "46: fixed up the previous misspelling of task_func*t*" 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -922,22 +923,22 @@ class full_tm_pipeline:
         .active_if(self.has_index(self.args.metaG_contigs, ['.amb','.bwt','.ann','.pac','.sa']))
             # Intended to be used when bwa indexes are present.
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#        rpl.collate(task_func = trimmomatic, # Stage 2a
-#            input = symlink_metaT,
-#            filter = ruffus.regex("R[12].fq.gz$"),
-#            output = ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"],
-#            extras = [
-#                "trimmomatic.log",
-#                self.logger, 
-#                self.logging_mutex]
-#            )
-        rpl.collate(trimmomatic, # Stage 2a
-            symlink_metaT,
-            ruffus.regex("R[12].fq.gz$"),
-            ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"],
-            "trimmomatic.log",
-            self.logger, self.logging_mutex
+        rpl.collate(task_func = trimmomatic, # Stage 2a
+            input = symlink_metaT,
+            filter = ruffus.regex("R[12].fq.gz$"),
+            output = ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"],
+            extras = [
+                "trimmomatic.log",
+                self.logger, 
+                self.logging_mutex]
             )
+#        rpl.collate(trimmomatic, # Stage 2a
+#            symlink_metaT,
+#            ruffus.regex("R[12].fq.gz$"),
+#            ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"],
+#            "trimmomatic.log",
+#            self.logger, self.logging_mutex
+#            )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl.subdivide(task_func = phiX_map, # Stage 3a
             input = trimmomatic,
@@ -956,21 +957,21 @@ class full_tm_pipeline:
             extras = [self.logger, self.logging_mutex]
             )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#        rpl.collate(task_funct = phiX_concat_ID, # Stage 3c
-#            input = phiX_ID, 
-#            filter = ruffus.formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),
-#            output = '{path[0]}/{BASE[0]}phiX_ID.log',
-#            extras = [
-#                '{BASE[0]}',
-#                self.logger, 
-#                self.logging_mutex]
-#            )
-        rpl.collate(phiX_concat_ID, # Stage 3c
-            phiX_ID, 
-            ruffus.formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),
-            '{path[0]}/{BASE[0]}phiX_ID.log','{BASE[0]}',
-            self.logger, self.logging_mutex
-        )
+        rpl.collate(task_func = phiX_concat_ID, # Stage 3c
+            input = phiX_ID, 
+            filter = ruffus.formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),
+            output = '{path[0]}/{BASE[0]}phiX_ID.log',
+            extras = [
+                '{BASE[0]}',
+                self.logger, 
+                self.logging_mutex]
+            )
+#        rpl.collate(phiX_concat_ID, # Stage 3c
+#            phiX_ID, 
+#            ruffus.formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),
+#            '{path[0]}/{BASE[0]}phiX_ID.log','{BASE[0]}',
+#            self.logger, self.logging_mutex
+#        )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #        rpl.subdivide(QC_output, # Stage 3d
 #            trimmomatic,

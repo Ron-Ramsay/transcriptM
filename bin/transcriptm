@@ -9,15 +9,15 @@
 # 4. (a) Created funct valid_adapters_fileloc in further_process_args. (b) Indented nicely the description parameter when calling cmdline.get_argparse."
 # 5. Tidied up some formatting of strings, etc. in parser_built_with_ruffus"
 # 7. In transcriptm, implemented funct valid_paired_end to check that all the paired end files exist."
-print "# 17: enabled pipeline_flow_chart."
+# 17: enabled pipeline_flow_chart."
+print "# 14a: added argument --end_stages"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Python Standard Library modules
+# Python Standard Library modules 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 import os        # miscellaneous operating system interfaces. (Python Standard Library module).
 import argparse  # parser for command-line options, arguments and sub-commands. (Python Standard Library module).
                  # NB. `argparse` only seems to be directly used here to be inherited by another class `CustomHelpFormatter`.
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # External, non-standard modules
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -25,13 +25,12 @@ import ruffus.cmdline as cmdline  # light-weight computational pipeline manageme
                                   # non-standard module. See http://www.ruffus.org.uk.
 import tempdir  # encapsulates temporary directories which just disappear after use. 
                 # non-standard module. See https://pypi.python.org/pypi/tempdir/
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Locally written modules
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 import transcriptm.__init__
-from transcriptm.pipeline import full_tm_pipeline  # custom pipeline class.
-
+import transcriptm.pipeline
+#from transcriptm.pipeline import full_tm_pipeline  # custom pipeline class.
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Functions
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -99,15 +98,21 @@ def parser_built_with_ruffus(objTempDir):
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # General options
     #? Coding: Can all of the `dest="..."` parameters be removed (since they don't vary from the --argument name)?
-    parser._optionals.title = "General options" # Overwrite the hard-coded title 'optional arguments' for this group of arguments, 
-                                                #  because presumably, most of these arguments are not optional.
-                                                # (nb. This call seems to delve behind the class's public interface, so this code has 
-                                                #  the potential to break if the underlying implementation is changed in the future).
+    parser._optionals.title = "General options" 
+        # Overwrite the hard-coded title 'optional arguments' for this group of arguments, 
+        #  because presumably, most of these arguments are not optional.
+        # (nb. This call seems to delve behind the class's public interface, so this code has 
+        #  the potential to break if the underlying implementation is changed in the future).
     parser.add_argument("--paired_end", nargs="+", dest="paired_end", 
                         help="Input files: paired sequences files of raw metatranscriptomics reads (.fq.gz format)\n" + \
                              "e.g. --paired_end sample1_1.fq.gz sample1_2.fq.gz sample2_1.fq.gz sample2_2.fq.gz", 
                         required=True)
-    parser.add_argument("--sortmerna_precomputed", dest="sortmerna_precomputed", help="Skip the steps up to and including SortMeRNA")
+    parser.add_argument("--end_stages", nargs="+", dest="end_stages",
+                            help="Run only up to and including these stages (and all their prerequisites).\n" + \
+                            "The list of available stages to specify here is as per the flowchart document at ...\n" +\
+                            "Specify  EITHER the stage NUMBER, e.g. 2a, or the stage NAME, e.g. trimmomatic.\n" +\
+                            transcriptm.pipeline.Valid_stages_str()
+                            )
     parser.add_argument("--metaG_contigs", dest="metaG_contigs", help="All contigs from the reference metagenome in a fasta file", required=True)
     parser.add_argument("--dir_bins", dest="dir_bins", help="Directory which contains several annotated population genomes (bins)\n" + \
                         "-> gff format, the others files would be ignored",
@@ -190,6 +195,26 @@ def further_process_args(args):
         and creates additional derived args in that namespace.
         """
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    def valid_end_stages():
+        """ checks the end_stages.
+            """
+        badness = False
+        for stage in args.end_stages:
+            print "### debug: end_stage:", stage
+            if stage[0].isdigit():
+                if stage not in transcriptm.pipeline.Valid_stages_dict().keys():
+                    badness = True
+            else:
+                if stage not in transcriptm.pipeline.Valid_stages_dict().values():
+                    badness = True
+        if badness:                    
+            raise Exception(
+                "\nStage <{0}> specified in --end_stages is not valid,.\n".format(stage) +\
+                "i.e. not a valid ID or NAME (choose just either an ID or name) from the following:\n" \
+                 + transcriptm.pipeline.Valid_stages_str()
+                )
+            exit(1)
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def valid_paired_end():
         """ checks that all the paired end files exist.
             """
@@ -236,7 +261,8 @@ def further_process_args(args):
                 "sortmerna/2.0/bin/indexdb_rna --ref path_db1,path_index1:path_db2,path_index2 ")
             exit(1) #? Is this line needed after raising an exception?
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    valid_paired_end()
+    valid_end_stages()
+    valid_paired_end() 
     valid_adapters_fileloc()
     valid_SortMeRNA()
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -250,7 +276,7 @@ def main_prog():
     args = parser.parse_args()  # Parse the command line.
     further_process_args(args)  # Further argument validation and creation.
     logger, logging_mutex = cmdline.setup_logging (__name__, args.log_file, args.verbose) # logging. #? Is this dead code?
-    pl = full_tm_pipeline(args) # Instantiate a custom Pipeline object.
+    pl = transcriptm.pipeline.full_tm_pipeline(args) # Instantiate a custom Pipeline object.
     pl.pipeline_stages()        # This is the method that defines all the pipelined functions; and issues cmdline.run(...)
     pl.clear()                  # 
     objTempDir.dissolve()       # ...behind the scenes: shutil.rmtree(self.name)

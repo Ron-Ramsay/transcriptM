@@ -10,7 +10,7 @@
 # 5. Tidied up some formatting of strings, etc. in parser_built_with_ruffus"
 # 7. In transcriptm, implemented funct valid_paired_end to check that all the paired end files exist."
 # 17: enabled pipeline_flow_chart."
-print "14a: added argument --end_stages"
+# 44: added argument --end_stages"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules 

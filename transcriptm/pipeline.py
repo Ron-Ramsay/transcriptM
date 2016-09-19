@@ -22,7 +22,9 @@
 # 41: ruffus.cmdline.run(self.args, target_tasks =. Also tried multiprocess = 5 which failed)" 
 # 42: ." 
 # 43: run target_tasks." 
-print "44: removed ruffus.follows dependency from view_raw_data and view_processed_data." 
+# 44: removed ruffus.follows dependency from view_raw_data and view_processed_data." 
+print "45: naming arguments to ruffus functions. Implementing end_stages." 
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -118,7 +120,7 @@ class full_tm_pipeline:
                 for stage in self.args.end_stages:
                     # If the stage is an ID then use the indexed stage name value, 
                     # else use the stage which should already be a valid stage name.
-                    self.target_tasks.append(valid_stages.get(stage, default=stage)) 
+                    self.target_tasks.append(valid_stages.get(stage, stage)) 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_ref_genome_phiX():
             """ instantiates and validates `self.ref_genome_phiX`: the filepath of the reference genome file (PhiX).
@@ -355,7 +357,7 @@ class full_tm_pipeline:
                 logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
             self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        def trimmomatic(input_files, output_file,log, logger, logging_mutex): # Stage 2a
+        def trimmomatic(input_files, output_file, log, logger, logging_mutex): # Stage 2a
             """ Trimmomatic. Trim and remove adapters of paired reads
                 """
             if len(input_files) != 2:
@@ -920,21 +922,24 @@ class full_tm_pipeline:
         .active_if(self.has_index(self.args.metaG_contigs, ['.amb','.bwt','.ann','.pac','.sa']))
             # Intended to be used when bwa indexes are present.
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.collate(trimmomatic, # Stage 2a
-            symlink_metaT,
-            ruffus.regex("R[12].fq.gz$"),
-            ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"],
-            "trimmomatic.log",
-            self.logger, self.logging_mutex
+        rpl.collate(task_func = trimmomatic, # Stage 2a
+            input = symlink_metaT,
+            filter = ruffus.regex("R[12].fq.gz$"),
+            output = ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"],
+            extras = [
+                "trimmomatic.log",
+                self.logger, 
+                self.logging_mutex]
             )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.subdivide(phiX_map, # Stage 3a
-            trimmomatic,
-            ruffus.formatter(r"(.+)/(?P<BASE>.*)P1.fq.gz"),
-            ["{path[0]}/phiX.{BASE[0]}P1.bam",
-             "{path[0]}/phiX.{BASE[0]}U1.bam",
-             "{path[0]}/phiX.{BASE[0]}U2.bam"], 
-            self.logger, self.logging_mutex
+        rpl.subdivide(task_func = phiX_map, # Stage 3a
+            input = trimmomatic,
+            filter = ruffus.formatter(r"(.+)/(?P<BASE>.*)P1.fq.gz"),
+            output = [
+                "{path[0]}/phiX.{BASE[0]}P1.bam",
+                "{path[0]}/phiX.{BASE[0]}U1.bam",
+                "{path[0]}/phiX.{BASE[0]}U2.bam"], 
+            extras = [self.logger, self.logging_mutex]
             )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl.transform(task_func = phiX_ID, # Stage 3b
@@ -944,17 +949,26 @@ class full_tm_pipeline:
             extras = [self.logger, self.logging_mutex]
             )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.collate(phiX_concat_ID, # Stage 3c
-            phiX_ID, 
-            ruffus.formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),
-            '{path[0]}/{BASE[0]}phiX_ID.log','{BASE[0]}',
-            self.logger, self.logging_mutex
+        rpl.collate(task_funct = phiX_concat_ID, # Stage 3c
+            input = phiX_ID, 
+            filter = ruffus.formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),
+            output = '{path[0]}/{BASE[0]}phiX_ID.log',
+            extras = [
+                '{BASE[0]}',
+                self.logger, 
+                self.logging_mutex]
             )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.subdivide(QC_output, # Stage 3d
-            trimmomatic,
-            ruffus.regex(r"trimm_[UP][12].fq.gz"),
-            ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"])
+#        rpl.subdivide(QC_output, # Stage 3d
+#            trimmomatic,
+#            ruffus.regex(r"trimm_[UP][12].fq.gz"),
+#            ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"]
+#            )
+        rpl.subdivide(task_func = QC_output, # Stage 3d
+            input = trimmomatic,
+            filter = ruffus.regex(r"trimm_[UP][12].fq.gz"),
+            output = ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"]
+            )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl.transform(task_func = phiX_extract, # Stage 3e
             input = QC_output,
@@ -964,20 +978,24 @@ class full_tm_pipeline:
             extras = [self.logger, self.logging_mutex]
             )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.subdivide(sortmerna, # Stage 4
-            phiX_extract,
-            ruffus.formatter(), 
-            "{path[0]}/{basename[0]}_non_ncRNA.fq",
-            "{path[0]}/{basename[0]}_ncRNA.fq",
-            self.logger, self.logging_mutex
+        rpl.subdivide(task_func = sortmerna, # Stage 4
+            input = phiX_extract,
+            filter = ruffus.formatter(), 
+            output = "{path[0]}/{basename[0]}_non_ncRNA.fq",
+            extras = [
+                "{path[0]}/{basename[0]}_ncRNA.fq",
+                self.logger, 
+                self.logging_mutex]
             )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.collate(concat_for_mapping, # Stage 5a
-            sortmerna,
-            ruffus.regex(r"trimm_.*"),
-            ["concat_paired_R1.fq","concat_paired_R2.fq","concat_single.fq"],
-            "ID_single.txt", 
-            self.logger, self.logging_mutex
+        rpl.collate(task_func = concat_for_mapping, # Stage 5a
+            input = sortmerna,
+            filter = ruffus.regex(r"trimm_.*"),
+            output = ["concat_paired_R1.fq", "concat_paired_R2.fq", "concat_single.fq"],
+            extras = [
+                "ID_single.txt", 
+                self.logger, 
+                self.logging_mutex]
             )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl.transform(task_func = map2ref, # Stage 5b
@@ -1005,33 +1023,52 @@ class full_tm_pipeline:
                 self.logging_mutex]
             )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.subdivide(bam2normalized_cov, # Stage 6a
-            bam_file, 
-            ruffus.formatter(),
-            '{path[0]}/*normalized_cov.csv',
-            '{path[0]}/coverage.csv',
-            self.args.dir_bins,
-            self.logger, self.logging_mutex
+#        rpl.subdivide(bam2normalized_cov, # Stage 6a
+#            bam_file, 
+#            ruffus.formatter(),
+#            '{path[0]}/*normalized_cov.csv',
+#            '{path[0]}/coverage.csv',
+#            self.args.dir_bins,
+#            self.logger, self.logging_mutex
+#            )
+        rpl.subdivide(task_func = bam2normalized_cov, # Stage 6a
+            input = bam_file, 
+            filter = ruffus.formatter(),
+            output = '{path[0]}/*normalized_cov.csv',
+            extras = [
+                '{path[0]}/coverage.csv',
+                self.args.dir_bins,
+                self.logger, 
+                self.logging_mutex]
             )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.subdivide(bam2raw_count, # Stage 6b
-            bam_file,ruffus.formatter(),
-            '{path[0]}/*count.csv',
-            self.list_gff,
-            self.logger, self.logging_mutex
+#        rpl.subdivide(bam2raw_count, # Stage 6b
+#            bam_file,ruffus.formatter(),
+#            '{path[0]}/*count.csv',
+#            self.list_gff,
+#            self.logger, self.logging_mutex
+#            )
+        rpl.subdivide(task_func = bam2raw_count, # Stage 6b
+            input = bam_file,
+            filter = ruffus.formatter(),
+            output = '{path[0]}/*count.csv',
+            extras = [
+                self.list_gff,
+                self.logger, 
+                self.logging_mutex]
             )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.merge(transcriptM_table, # Stage 7a # Concatenate all the normalized_cov results in a table
-            bam2normalized_cov, 
-            os.path.join(self.args.output_dir,os.path.basename(self.args.output_dir)+'_NORM_COVERAGE.csv'),
-            self.logger, self.logging_mutex
+        rpl.merge(task_func = transcriptM_table, # Stage 7a # Concatenate all the normalized_cov results in a table
+            input = bam2normalized_cov, 
+            output = os.path.join(self.args.output_dir,os.path.basename(self.args.output_dir)+'_NORM_COVERAGE.csv'),
+            extras = [self.logger, self.logging_mutex]
             )\
         .mkdir(self.args.output_dir)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.merge(raw_count_table, # Stage 7b # Concatenate all the raw count in a table
-            bam2raw_count,
-            os.path.join(self.args.output_dir, os.path.basename(self.args.output_dir)+'_COUNT.csv'),
-            self.logger, self.logging_mutex
+        rpl.merge(task_func = raw_count_table, # Stage 7b # Concatenate all the raw count in a table
+            input = bam2raw_count,
+            output = os.path.join(self.args.output_dir, os.path.basename(self.args.output_dir)+'_COUNT.csv'),
+            extras = [self.logger, self.logging_mutex]
             )\
         .mkdir(self.args.output_dir)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1055,12 +1092,13 @@ class full_tm_pipeline:
 #        .mkdir(self.SUBDIR_FastQC_processed)\
 #        .follows(bam2normalized_cov)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.collate(logtable, # Stage 6R2  
-            save_log, 
-            ruffus.formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|" + \
+        rpl.collate(task_func = logtable, # Stage 6R2  
+            input = save_log, 
+            filter = 
+                ruffus.formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|" + \
                 "(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
-            self.SUBDIR_reads_distribution + "/{BASE[0]}_reads_stat",
-            '{BASE[0]}'
+            output = self.SUBDIR_reads_distribution + "/{BASE[0]}_reads_stat",
+            extras = ['{BASE[0]}']
             )\
         .mkdir(self.SUBDIR_reads_distribution)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1073,10 +1111,10 @@ class full_tm_pipeline:
         .mkdir(self.SUBDIR_log)\
         .follows(bam2normalized_cov)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.merge(concatenate_logtables, # Stage 6R3
-            logtable, 
-            os.path.join(self.args.output_dir, 'summary_reads'), 
-            self.logger, self.logging_mutex
+        rpl.merge(task_func = concatenate_logtables, # Stage 6R3
+            input = logtable, 
+            output = os.path.join(self.args.output_dir, 'summary_reads'), 
+            extras = [self.logger, self.logging_mutex]
             )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl.transform(task_func = save_processed_reads, # Stage 5aR
@@ -1110,7 +1148,7 @@ class full_tm_pipeline:
 #            rpl.run(target_tasks = self.args.end_stages, verbose = 0) # verbose = 0 defaults to 1
         rpl.run(target_tasks = self.target_tasks, verbose = 0) # verbose = 0 defaults to 1
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # CLEAR FUNCTION: 
+    # Post-pipeline activity
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def clear(self):
         """ tidy-up of the program's output directory, (renames certain files, and deletes a subdirectory),

@@ -21,7 +21,8 @@
 # 40: use of self.SUBDIR_ constants to erase dirs at the start in one place." 
 # 41: ruffus.cmdline.run(self.args, target_tasks =. Also tried multiprocess = 5 which failed)" 
 # 42: ." 
-print "43: run target_tasks." 
+# 43: run target_tasks." 
+print "44: removed ruffus.follows dependency from view_raw_data and view_processed_data." 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -106,26 +107,19 @@ class full_tm_pipeline:
         """ (routines automatically executed upon instantiation of an instance of this class).
             """
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        def V_end_stages():
-            """ populates dict `self.alias_pe` of aliases symbolically linked filenames to the paired-end reads.
-                key: working directory filenames (but these files will not yet be created).
-                       format: `sample-n_R1.fq.gz`, `sample-n_R2.fq.gz`, 
-                       where 'n' is a zero-based counter for each pair of filenames. 
-                value: original filenames (of metatranscriptomic reads), as listed in argument `paired_end`.
-                e.g. {'/srv/home/s4293029/tm_working/sample-0_R1.fq.gz': 
-                        '/srv/home/s4293029/tm_data/20120800_P2M.1.fq.gz', ...}
+        def V_target_tasks():
+            """ generates `self.target_tasks`, a list parsed from `self.args.end_stages`, 
+                (where those stages have already been validated as being a valid ID or Name).
+                The resulting list is intended to be passed to ruffus' pipeline.run. 
                 """
-            self.alias_pe = {}  
-            for i in range(int(len(self.args.paired_end)/2)): # Loop an index through the pairs in the `paired_end` list.
-                self.alias_pe[os.path.join(self.args.working_dir, 'sample-'+str(i)+'_R1.fq.gz')] = \
-                    self.args.paired_end[2*i]
-                self.alias_pe[os.path.join(self.args.working_dir, 'sample-'+str(i)+'_R2.fq.gz')] = \
-                    self.args.paired_end[2*i+1]
-#            print "Debug: self.alias_pe:", self.alias_pe
-#            {'/srv/home/s4293029/tm_working/sample-0_R1.fq.gz': '/srv/home/s4293029/tm_data/20120800_P2M.1.fq.gz', 
-#            '/srv/home/s4293029/tm_working/sample-0_R2.fq.gz': '/srv/home/s4293029/tm_data/20120800_P2M.2.fq.gz'}
+            self.target_tasks = []
+            if self.args.end_stages:
+                valid_stages = Valid_stages_dict() # gets a working copy.
+                for stage in self.args.end_stages:
+                    # If the stage is an ID then use the indexed stage name value, 
+                    # else use the stage which should already be a valid stage name.
+                    self.target_tasks.append(valid_stages.get(stage, default=stage)) 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_ref_genome_phiX():
             """ instantiates and validates `self.ref_genome_phiX`: the filepath of the reference genome file (PhiX).
                 """
@@ -220,17 +214,20 @@ class full_tm_pipeline:
                 self.SUBDIR_log,
                 self.SUBDIR_FastQC_raw,
                 self.SUBDIR_FastQC_processed,
-                self.SUBDIR_processed_reads]
+                self.SUBDIR_processed_reads
+                ]
             # list of subdirectories to be deleted at the end of the pipeline.
             self.SUBDIRS_for_clearing = [
-                self.SUBDIR_reads_distribution]
+                self.SUBDIR_reads_distribution
+                ]
             # Clean the subdirs (of previous run output). ###! Shouldn't we clear the whole output directory?
             for subdir in [
                     self.SUBDIR_log,
                     self.SUBDIR_FastQC_raw,
                     self.SUBDIR_FastQC_processed,
                     self.SUBDIR_reads_distribution,
-                    self.SUBDIR_processed_reads]:
+                    self.SUBDIR_processed_reads
+                    ]:
                 try:
                     shutil.rmtree(self.SUBDIR_FastQC_raw)
                 except OSError:
@@ -248,6 +245,7 @@ class full_tm_pipeline:
         # Store arguments passed.
         self.args = args             
         # Generate and Validate derived arguments...
+        V_target_tasks()
         V_ref_genome_phiX()
         V_list_gff()
         V_alias_pe()
@@ -362,7 +360,6 @@ class full_tm_pipeline:
                 """
             if len(input_files) != 2:
                 raise Exception("One of read pairs %s missing" % (input_files,))  
-            
             cmd = "trimmomatic PE "
             cmd += "-threads %d " % (self.args.threads)
             cmd += "-%s " % (self.args.phred)
@@ -380,13 +377,10 @@ class full_tm_pipeline:
             cmd += "HEADCROP:%d " % (self.args.headcrop)
             cmd += "MINLEN:%d " % (self.args.min_len)
             cmd += "2> %s" % (log)
-
             with logging_mutex:
                 logger.info("Trim and remove adapters of paired reads of %(input_files)s" % locals())
                 logger.debug("trimmomatic: cmdline\n"+ cmd)
-            
             extern.run(cmd)
-            
             #  ~~~~ monitoring: count of reads  ~~~~ #  
             name_sample = self.prefix_pe[os.path.basename(input_files[0]).split('_R1.fq.gz')[0]]            
             stat = Monitoring(self.tot_pe[name_sample])
@@ -564,20 +558,17 @@ class full_tm_pipeline:
                 logger.info("Map reads [%s] to the reference metagenome %s"%(",".join(input_files[0]), input_files[1]))
                 logger.debug("map2ref: cmdline\n"+ cmd)  
             extern.run(cmd)
-            
             cmd2 = "samtools merge -f %s %s %s ; samtools view -b -F2304 %s > %s " % \
                     (bams[2], bams[0], bams[1], bams[2], output_file)
             with logging_mutex:     
                 logger.info("Concatenate %s and %s"%(bams[0],bams[1]))
                 logger.debug("map2ref: cmdline\n"+ cmd2)  
             extern.run(cmd2)
-                
             cmd3 = "samtools flagstat %s > %s " %(output_file,flagstat)
             with logging_mutex:     
                 logger.info("Compute statistics of %(output_file)s (samtools flastat)"%locals())
                 logger.debug("map2ref: cmdline\n"+ cmd3)  
             extern.run(cmd3)
-    
             #  ~~~~ monitoring: count of reads  ~~~~ #   
             name_sample = self.prefix_pe[os.path.basename(output_file).split('.bam')[0]]            
             stat= Monitoring(self.tot_pe[name_sample])
@@ -1050,8 +1041,9 @@ class full_tm_pipeline:
             output = os.path.join(self.SUBDIR_FastQC_raw, "{basename[0]}"+"_fastqc.zip"), #!Is there really output?
             extras = [self.logger, self.logging_mutex]
             )\
-        .mkdir(self.SUBDIR_FastQC_raw)\
-        .follows(bam2normalized_cov)
+        .mkdir(self.SUBDIR_FastQC_raw)
+#        .mkdir(self.SUBDIR_FastQC_raw)\
+#        .follows(bam2normalized_cov)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl.transform(task_func = view_processed_data, # Stage 2aR
             input = trimmomatic, 
@@ -1059,9 +1051,9 @@ class full_tm_pipeline:
             output = os.path.join(self.SUBDIR_FastQC_processed, "{basename[0]}"+"_fastqc.zip"), #!Is there really output?
             extras = [self.logger, self.logging_mutex]
             )\
-        .mkdir(self.SUBDIR_FastQC_processed)\
-        .follows(bam2normalized_cov)
-#        .mkdir(self.SUBDIR_FastQC_processed)
+        .mkdir(self.SUBDIR_FastQC_processed)
+#        .mkdir(self.SUBDIR_FastQC_processed)\
+#        .follows(bam2normalized_cov)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl.collate(logtable, # Stage 6R2  
             save_log, 
@@ -1111,15 +1103,14 @@ class full_tm_pipeline:
         #multithread = 3
         #multiprocess = 5)
         #ruffus.cmdline.run(target_tasks = [trimmomatic])
-        if False and len(self.args.end_stages) == 0:
-            rpl.run(target_tasks = [self.args.end_stages[0]], verbose = 0) # verbose = 0 defaults to 1
-        else:
-            #rpl.run(target_tasks = [], verbose = 0) # verbose = 0 defaults to 1
-            rpl.run(target_tasks = self.args.end_stages, verbose = 0) # verbose = 0 defaults to 1
-
- 
+#        if False and len(self.args.end_stages) == 0:
+#            rpl.run(target_tasks = [self.args.end_stages[0]], verbose = 0) # verbose = 0 defaults to 1
+#        else:
+#            #rpl.run(target_tasks = [], verbose = 0) # verbose = 0 defaults to 1
+#            rpl.run(target_tasks = self.args.end_stages, verbose = 0) # verbose = 0 defaults to 1
+        rpl.run(target_tasks = self.target_tasks, verbose = 0) # verbose = 0 defaults to 1
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # CLEAR FUNCTION:
+    # CLEAR FUNCTION: 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def clear(self):
         """ tidy-up of the program's output directory, (renames certain files, and deletes a subdirectory),

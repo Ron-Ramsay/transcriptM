@@ -24,7 +24,7 @@
 # 43: run target_tasks." 
 # 44: removed ruffus.follows dependency from view_raw_data and view_processed_data." 
 # 45: naming arguments to ruffus functions. Implementing end_stages." 
-print "46: fixed up the previous misspelling of task_func*t*" 
+print "47: fixed up the previous misspelling of task_func*t*" 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -1175,12 +1175,16 @@ class full_tm_pipeline:
             for subdir in self.SUBDIRS_for_content_renaming:
                 if os.path.exists(subdir):
                     for f in os.listdir(subdir): # Iterate through each file in that subdirectory, to rename the file.
-                        f_oldname = os.path.join(subdir, f)          
-                        f_newname = os.path.join(subdir, 
+                        original_name = self.prefix_pe.get(f.split('_')[0])
+                        # Allow for the case that the file has already been renamed in previous runs.
+                        if original_name != None: 
+                            self.prefix_pe[f.split('_')[0]]
+                            f_oldname = os.path.join(subdir, f)          
                             # Replace the first part of the filenames, i.e. up to the first "_",
                             # by the first part of `self.prefix_pe`, i.e. up to the first "_". 
-                            string.replace(f, f.split('_')[0], self.prefix_pe[f.split('_')[0]]))
-                        os.rename(f_oldname, f_newname)
+                            f_newname = os.path.join(subdir, string.replace(f, f.split('_')[0], original_name))
+                            os.rename(f_oldname, f_newname)
+
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def clear_SUBDIRs():
             for subdir in self.SUBDIRS_for_clearing:

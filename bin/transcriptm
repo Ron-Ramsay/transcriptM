@@ -1,62 +1,57 @@
 #!/usr/bin/env python
 """ Main callable module to run TranscriptM: a rapid-throughput pipeline of meta-transcriptomes. 
-	See http://http://transcriptm.tiddlyspot.com/
-    """
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Developer's temporary playground
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# 3: Created funct further_process_args to run valid_SortMeRNA. Encapsulated funct CustomHelpFormatter into parser_built_with_ruffus."
-# 4. (a) Created funct valid_adapters_fileloc in further_process_args. (b) Indented nicely the description parameter when calling cmdline.get_argparse."
-# 5. Tidied up some formatting of strings, etc. in parser_built_with_ruffus"
-# 7. In transcriptm, implemented funct valid_paired_end to check that all the paired end files exist."
-# 17: enabled pipeline_flow_chart."
-# 44: added argument --end_stages"
+    See http://transcriptm.tiddlyspot.com/ """
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Developer's temporary playground
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+print "51: Removed all `exit(1)` after raise `Exception`."\
+         " Removed `objTempDir.dissolve()`, since automatic."\
+         " Changed `working_dir` argument to be not required, since a temporary directory would be created for it."\
+         " Removed possible dead code: logger, logging_mutex = cmdline.setup_logging."
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 import os        # miscellaneous operating system interfaces. (Python Standard Library module).
 import argparse  # parser for command-line options, arguments and sub-commands. (Python Standard Library module).
-                 # NB. `argparse` only seems to be directly used here to be inherited by another class `CustomHelpFormatter`.
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # External, non-standard modules
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-import ruffus.cmdline as cmdline  # light-weight computational pipeline management. 
-                                  # non-standard module. See http://www.ruffus.org.uk.
-import tempdir  # encapsulates temporary directories which just disappear after use. 
-                # non-standard module. See https://pypi.python.org/pypi/tempdir/
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+import ruffus.cmdline as cmdline  # light-weight computational pipeline management. See http://www.ruffus.org.uk.
+import tempdir                    # encapsulates temporary directories which just disappear after use. 
+                                  # non-standard module. See https://pypi.python.org/pypi/tempdir/
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Locally written modules
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 import transcriptm.__init__
 import transcriptm.pipeline
-#from transcriptm.pipeline import full_tm_pipeline  # custom pipeline class.
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Functions
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-def parser_built_with_ruffus(objTempDir):
-    ''' returns a command line parser (of type `argparse.ArgumentParser`) that is built with options specific to our program and `ruffus`.
-        Parameters: `objTempDir`: a `tempdir.TempDir` object (specifying a working directory to be used if needed).
-        '''
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+def parser_built_with_ruffus():
+    """ returns a command line parser (type: `argparse.ArgumentParser`) 
+        that is built with options specific to our program and the module `ruffus`.
+    """
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     class CustomHelpFormatter(argparse.HelpFormatter):
-        ''' This class is a remodelling of `argparse.HelpFormatter`.
-            It is used by being passed as a class, to cmdline.get_argparse(..., formatter_class=CustomHelpFormatter).
-            However, in doing so, our custom class redefines methods that are not part of `argparse.HelpFormatter`'s API. 
-            Therefore there exists the potential for our code to break if these methods 
+        """ This class is a remodelling of `argparse.HelpFormatter`.
+            It is used by being passed as a class, to `cmdline.get_argparse(..., formatter_class=CustomHelpFormatter)`.
+            However, in doing so, our custom class redefines methods that are not part of `argparse.HelpFormatter`'s 
+            API. Therefore there exists the potential for our code to break if these methods 
             (which are supposed to be a non-public implementation) are remodelled in a newer version of `argparse`.
-            '''
+        """
         def _split_lines(self, text, width): # redefinition.
             return text.splitlines()
         def _get_help_string(self, action): # redefinition.
             h = action.help
             if '%(default)' not in action.help:
-                if action.default != '' and \
-                   action.default != [] and \
-                   action.default != None :
+                if action.default != '' and action.default != [] and action.default != None:
                     if action.default is not argparse.SUPPRESS:
-                        defaulting_nargs = [argparse.OPTIONAL,
-                                            argparse.ZERO_OR_MORE]
+                        defaulting_nargs = [argparse.OPTIONAL, argparse.ZERO_OR_MORE]
                         if (action.option_strings or action.nargs in defaulting_nargs) :
                             if not (type(action.default)==str and len(action.default)>50):
                                 if '\n' in h:
@@ -75,19 +70,20 @@ def parser_built_with_ruffus(objTempDir):
             return h
         def _fill_text(self, text, width, indent): # redefinition.
             return ''.join([indent + line for line in text.splitlines(True)])
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Instantiate the parser.
     parser = cmdline.get_argparse(
-        description = '\n' \
-            '                    ==============================                           \n' \
-            '                           TranscriptM v{0}                                  \n' \
-            '                    ==============================                           \n' \
-            '                                                                             \n' \
-            '   ------------------------------------------------------------------------- \n' \
-            '       Process metatranscriptomic data and complete metagenomics analysis    \n' \
-            '   ------------------------------------------------------------------------- \n' \
-            '   e.g. usage:                                                               \n' \
-            'transcriptm --paired_end sample1-1.fq.gz sample1-2.fq.gz sample2-1.fq.gz sample2-2.fq.gz --metaG_contigs assembly.fa --dir_bins dir_gff' \
+        description = '\n'\
+            '                    ==============================                           \n'\
+            '                           TranscriptM v{0}                                  \n'\
+            '                    ==============================                           \n'\
+            '                                                                             \n'\
+            '   ------------------------------------------------------------------------- \n'\
+            '       Process metatranscriptomic data and complete metagenomics analysis    \n'\
+            '   ------------------------------------------------------------------------- \n'\
+            '   e.g. usage:                                                               \n'\
+            'transcriptm --paired_end sample1-1.fq.gz sample1-2.fq.gz sample2-1.fq.gz sample2-2.fq.gz '+\
+            '--metaG_contigs assembly.fa --dir_bins dir_gff' \
             .format(transcriptm.__version__), 
         version = "transcriptm v{0}".format(transcriptm.__version__),
         formatter_class = CustomHelpFormatter,
@@ -95,64 +91,73 @@ def parser_built_with_ruffus(objTempDir):
                         "use_threads", "forced_tasks", "touch_files_only", "checksum_file_name"] 
                         # "flowchart", "draw_graph_horizontally", "flowchart_format"]
         )
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # General options
-    #? Coding: Can all of the `dest="..."` parameters be removed (since they don't vary from the --argument name)?
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # General options:
     parser._optionals.title = "General options" 
         # Overwrite the hard-coded title 'optional arguments' for this group of arguments, 
-        #  because presumably, most of these arguments are not optional.
-        # (nb. This call seems to delve behind the class's public interface, so this code has 
-        #  the potential to break if the underlying implementation is changed in the future).
-    parser.add_argument("--paired_end", nargs="+", dest="paired_end", 
-                        help="Input files: paired sequences files of raw metatranscriptomics reads (.fq.gz format)\n" + \
-                             "e.g. --paired_end sample1_1.fq.gz sample1_2.fq.gz sample2_1.fq.gz sample2_2.fq.gz", 
-                        required=True)
+        # because presumably, most of these arguments are not optional.
+        # This call seems to delve behind the class's public interface, so this code 
+        # has the potential to break if the underlying implementation is changed in the future.
+
+    parser.add_argument("--paired_end", nargs="+", dest="paired_end", required=True,
+            help="Input files: paired sequences files of raw metatranscriptomics reads (.fq.gz format)\n" +\
+            "e.g. --paired_end sample1_1.fq.gz sample1_2.fq.gz sample2_1.fq.gz sample2_2.fq.gz")
+
     parser.add_argument("--end_stages", nargs="+", dest="end_stages",
-                            help="Run only up to and including these stages (and all their prerequisites).\n" + \
-                            "The list of available stages to specify here is as per the flowchart document at ...\n" +\
-                            "Specify  EITHER the stage NUMBER, e.g. 2a, or the stage NAME, e.g. trimmomatic.\n" +\
-                            transcriptm.pipeline.Valid_stages_str()
-                            )
-    parser.add_argument("--metaG_contigs", dest="metaG_contigs", help="All contigs from the reference metagenome in a fasta file", required=True)
-    parser.add_argument("--dir_bins", dest="dir_bins", help="Directory which contains several annotated population genomes (bins)\n" + \
-                        "-> gff format, the others files would be ignored",
-                        required=True)
-    parser.add_argument("--threads", dest="threads", help="Number of threads to use", default=20, type=int)
-    ### General option: TranscriptM database path:
-    # Check if the db is an environment variable.
+            help="Run only up to and including these stages (and all their prerequisites).\n" +\
+            "The list of available stages to specify here is as per the flowchart document at ...\n" +\
+            "Specify EITHER the stage NUMBER, e.g. 2a, or the stage NAME, e.g. trimmomatic.\n" +\
+            transcriptm.pipeline.Valid_stages_str())
+
+    parser.add_argument("--metaG_contigs", dest="metaG_contigs", required=True, 
+            help="All contigs from the reference metagenome in a fasta file")
+
+    parser.add_argument("--dir_bins", dest="dir_bins", required=True,
+            help="Directory which contains several annotated population genomes (bins)\n" +\
+            "-> gff format, the others files would be ignored")
+
+    parser.add_argument("--threads", dest="threads", default=20, type=int, help="Number of threads to use")
+
+    # General option: TranscriptM database path:
     db_path=None    
     try :
-        db_path= os.environ['TRANSCRIPTM_DATABASE']
+        db_path = os.environ['TRANSCRIPTM_DATABASE'] # Check if the db is an environment variable.
     except KeyError:
         pass 
     if db_path:
-        parser.add_argument("--db_path", dest="db_path", help="Directory which contains the TranscriptM databases", default= db_path)
-    else :
-        parser.add_argument("--db_path", dest="db_path", help="Directory which contains the TranscriptM databases",required=True)
-    parser.add_argument("--output_dir", dest="output_dir", help="Output directory ", default='TranscriptM_output')
-    ### General option: temporary working directory:
-    ''' This could be handled better. The default does not need to be and should not be defined here. '''
+        parser.add_argument("--db_path", dest="db_path", default= db_path, 
+                help="Directory which contains the TranscriptM databases")
+    else:
+        parser.add_argument("--db_path", dest="db_path", required=True, 
+                help="Directory which contains the TranscriptM databases")
+
+    parser.add_argument("--output_dir", dest="output_dir", default='TranscriptM_output', help="Output directory ")
+
+    # General option: working directory:
     parser.add_argument("--working_dir", dest="working_dir", 
-                        help="Working directory (dynamically created if not specified)", 
-                        default=objTempDir.name)
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Trimmomatic options
+            help="Working directory. If not specified, a temporary directory is dynamically created and dispossed of).")
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Trimmomatic options:
     trimm_args=parser.add_argument_group('Trimmomatic options')
-    trimm_args.add_argument('--adapters', help="Type of adapters to clip ", choices=['nextera', 'truseq'],default= 'truseq')
-    trimm_args.add_argument('--min_len', help="Minimum required length of read ", type=int, default = 30)
-    trimm_args.add_argument('--min_avg_qc', help="Minimum average quality score for 4 bp windows ", type=int, default = 25)
-    trimm_args.add_argument('--phred', help="Quality encoding ", choices=['phred33', 'phred64'],default='phred33')
-    trimm_args.add_argument('--min_qc', help="Minimum quality score for leading and trailing bases ", type=int, default = 20)
-    trimm_args.add_argument('--crop', help="Cut read to a specific length ", type=int, default = 10000)
-    trimm_args.add_argument('--headcrop', help="Cut specified number of bases from start of read ", type=int, default = 0)
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # SortMeRNA options
+    trimm_args.add_argument('--adapters', choices=['nextera', 'truseq'], default='truseq', 
+                                    help="Type of adapters to clip")
+    trimm_args.add_argument('--min_len', help="Minimum required length of read", type=int, default = 30)
+    trimm_args.add_argument('--min_avg_qc', type=int, default=25, 
+                                    help="Minimum average quality score for 4 bp windows")
+    trimm_args.add_argument('--phred', help="Quality encoding", choices=['phred33', 'phred64'],default='phred33')
+    trimm_args.add_argument('--min_qc', type=int, default=20, 
+                                    help="Minimum quality score for leading and trailing bases")
+    trimm_args.add_argument('--crop', help="Cut read to a specific length", type=int, default = 10000)
+    trimm_args.add_argument('--headcrop', help="Cut specified number of bases from start of read", type=int, default=0)
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # SortMeRNA options:
     sortmerna_args=parser.add_argument_group('SortMeRNA options')    
     if db_path:
         path_rRNA = os.path.join(db_path, "1-SortMeRNA/rRNA_databases")
-        path_tRNA= os.path.join(db_path, "1-SortMeRNA/tRNA_databases")
+        path_tRNA = os.path.join(db_path, "1-SortMeRNA/tRNA_databases")
         path_index = os.path.join(db_path, "1-SortMeRNA/index")
-        db_smr = \
+        db_smr =\
             '%s/silva-bac-16s-id90.fasta,%s/silva-bac-16s-db:'\
             '%s/silva-bac-23s-id98.fasta,%s/silva-bac-23s-db:'\
             '%s/silva-arc-16s-id95.fasta,%s/silva-arc-16s-db:'\
@@ -169,44 +174,47 @@ def parser_built_with_ruffus(objTempDir):
             '%s/rfam-tRNA.fa,%s/rfam-tRNA-db:'\
             '%s/rfam-tRNA_Sec.fa,%s/rfam-tRNA_Sec-db'\
             % ((path_rRNA, path_index)*8+(path_tRNA, path_index)*7)
-        sortmerna_args.add_argument('--path_db_smr', 
+        sortmerna_args.add_argument('--path_db_smr', default=db_smr, 
             help="Path to databases and index\n" + \
-                 "e.g. path_db1,path_index1:path_db2,path_index2 [default: rRNA and tRNA db]\n" + \
-                 "NB: index must be created with the script sortmerna/2.0/bin/indexdb_rna",
-            default=db_smr)
+                "e.g. path_db1,path_index1:path_db2,path_index2 [default: rRNA and tRNA db]\n" + \
+                "NB: index must be created with the script sortmerna/2.0/bin/indexdb_rna")
     else:
-        sortmerna_args.add_argument('--path_db_smr', 
+        sortmerna_args.add_argument('--path_db_smr', required=True,
             help="Path to databases and index\n e.g. path_db1,path_index1:path_db2,path_index2\n" + \
-                 "NB: index must be created with the script sortmerna/2.0/bin/indexdb_rna",
-            required=True)
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Mapping options (BamM filter)
+                "NB: index must be created with the script sortmerna/2.0/bin/indexdb_rna")
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Mapping options (BamM filter):
     mapping_args=parser.add_argument_group('Mapping options (BamM filter)')
-    mapping_args.add_argument('--percentage_id', type=float, dest='percentage_id', help='Minimum allowable percentage base identity of a mapped read', default=0.97)
-    mapping_args.add_argument('--percentage_aln', type=float, dest='percentage_aln', help='Minimum allowable percentage read bases mapped', default=0.95)
-    mapping_args.add_argument('--no_mapping_filter',  action="store_true", dest='no_mapping_filter', help='Do not adjust the mapping stringency by filtering alignments', default=False)
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    mapping_args.add_argument('--percentage_id', type=float, dest='percentage_id', default=0.97, 
+                              help='Minimum allowable percentage base identity of a mapped read')
+    mapping_args.add_argument('--percentage_aln', type=float, default=0.95, dest='percentage_aln', 
+                              help='Minimum allowable percentage read bases mapped')
+    mapping_args.add_argument('--no_mapping_filter',  action="store_true", dest='no_mapping_filter', default=False, 
+                              help='Do not adjust the mapping stringency by filtering alignments')
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     return parser
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def further_process_args(args):
     """ performs further validations on `args` (parsed command-line arguments), 
         and creates additional derived args in that namespace.
-        """
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    def valid_end_stages():
-        """ checks the end_stages.
-            """
-        if args.end_stages:
-            badness = False
+    """
+    ''' Note: vars(args) can be used to update the `args` Namespace object as a virtual dictionary. 
+            i.e. it is synonymous with `args._dict__`
+            ref. documentation at https://docs.python.org/2.7/library/functions.html#vars
+    '''
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    def V_end_stages():
+        """ checks the end_stages. """
+        if args.end_stages: # check this parameter only if it was specified.
+            badness = False # initialize flag.
             for stage in args.end_stages:
                 print "### debug: end_stage:", stage
-                if stage[0].isdigit():
-                    if stage not in transcriptm.pipeline.Valid_stages_dict().keys():
+                if stage[0].isdigit(): # stage begins with a digit, so is a stage id.
+                    if stage not in transcriptm.pipeline.Valid_stages_dict().keys(): # check the list.
                         badness = True
                 else:
-                    if stage not in transcriptm.pipeline.Valid_stages_dict().values():
+                    if stage not in transcriptm.pipeline.Valid_stages_dict().values(): # check the list.
                         badness = True
             if badness:                    
                 raise Exception(
@@ -214,73 +222,75 @@ def further_process_args(args):
                     "i.e. not a valid ID or NAME (choose just either an ID or name) from the following:\n" \
                      + transcriptm.pipeline.Valid_stages_str()
                     )
-                exit(1)
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    def valid_paired_end():
-        """ checks that all the paired end files exist.
-            """
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    def V_paired_end():
+        """ checks that all the paired end files exist. """
         for filename in args.paired_end:
             if not os.path.isfile(filename):
                 raise Exception("File <{0}> specified in --paired_end does not exist.".format(filename))
-                exit(1)
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    def valid_adapters_fileloc():
+                
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    def V_working_dir():
+        """ if the `working_dir` is not specified, creates a temporary directory that will be automatically dissolved.
+        """
+        if not args.working_dir:
+            vars(args)['working_dir'] = tempdir.TempDir().name
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    def V_adaptersFile():
         """ creates a new arg `adaptersFile`, pointing to an expected file location under `db_path`, 
-            and tests for the presence of that file.
-            """
-        argsDict = vars(args) # working variable to refer to `args` to update it.
-        ''' Use this working variable to update the `args` Namespace object as a virtual dictionary. 
-            i.e. it is synonymous with `args._dict__`
-            ref. documentation at https://docs.python.org/2.7/library/functions.html#vars
-            '''
+            and tests for the presence of that file. 
+        """
         # Get the folder where the adapters file should exist.
         adapters_folder = os.path.join(args.db_path, "0-Adapters") 
         # Select the type of filename, based on user parameter `adapters`.
         adapters_basename = {'truseq':'TruSeq3-PE-2.fa', 'nextera':'NexteraPE-PE.fa'}.get(args.adapters) 
         # Creation of new arg:
-        argsDict['adaptersFile'] = os.path.join(adapters_folder, adapters_basename) 
-        # Validate that the file (specified by the newly created variable) exists.
+        vars(args)['adaptersFile'] = os.path.join(adapters_folder, adapters_basename) 
+        # Validate that the file exists.
         if not os.path.isfile(args.adaptersFile):
             raise Exception(
                 "The subdirectory `0-Adapters` or the file `%s` does not exist in `%s` (the db_path provided)"
                 %(os.path.basename(args.adaptersFile), args.db_path))
-            exit(1) #? Is this line needed after raising an exception?
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    def valid_SortMeRNA():
-        """ performs cursory validation that the SortMeRNA database is indexed.
-        """
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    def V_SortMeRNA():
+        """ performs cursory validation that the SortMeRNA database is indexed. """
         if os.path.isdir(os.path.join(args.db_path, "1-SortMeRNA/")) and \
                 not os.path.isdir(os.path.join(args.db_path, '1-SortMeRNA/index')):
-            ###? DEADCODE? (None of these variables are used again).
-            if True:
-                path_rRNA = os.path.join(args.db_path,"1-SortMeRNA/rRNA_databases")
-                path_tRNA= os.path.join(args.db_path,"1-SortMeRNA/tRNA_databases")
-                path_index = os.path.join(args.db_path,"1-SortMeRNA/index")
-            ### END_DEADCODE
             raise Exception(
-                "No index found for SortMeRNA database.\n Use the cmdline below: \n" + \
-                "sortmerna/2.0/bin/indexdb_rna --ref path_db1,path_index1:path_db2,path_index2 ")
-            exit(1) #? Is this line needed after raising an exception?
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    valid_end_stages()
-    valid_paired_end() 
-    valid_adapters_fileloc()
-    valid_SortMeRNA()
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                "No index found for SortMeRNA database.\nUse the cmdline below:\n" + \
+                "sortmerna/2.0/bin/indexdb_rna --ref path_db1,path_index1:path_db2,path_index2")
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    V_end_stages()
+    V_paired_end() 
+    V_working_dir()
+    V_adaptersFile()
+    V_SortMeRNA()
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+def debug_namespace(namespace):
+    """ helper: debugging. """
+    print
+    for (index, val) in vars(namespace).items():
+        print "> {0}: {2} {1}".format(index, type(val), val)
+    print
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def main_prog():
-    """ runs the main program for TranscriptM.
-        """
-    objTempDir = tempdir.TempDir() # Create a `tempdir` object to be used as a program argument default, just in case the user doesn't specify the working directory. This could be handled better.
-    parser = parser_built_with_ruffus(objTempDir) # Initialise a command line parser that is configured with options specific to our program and `ruffus`.
-    args = parser.parse_args()  # Parse the command line.
-    further_process_args(args)  # Further argument validation and creation.
-    logger, logging_mutex = cmdline.setup_logging (__name__, args.log_file, args.verbose) # logging. #? Is this dead code?
+    """ main program control. """
+    # Initialise a command line parser that is configured with options specific to our program and `ruffus`.
+    parser = parser_built_with_ruffus() 
+    # Parse the command line.
+    args = parser.parse_args()  
+    # Perform further argument validation and creation.
+    further_process_args(args)  
+    debug_namespace(args)
+#    logger, logging_mutex = cmdline.setup_logging (__name__, args.log_file, args.verbose) # logging. #? Is this dead code?
     pl = transcriptm.pipeline.full_tm_pipeline(args) # Instantiate a custom Pipeline object.
-    pl.pipeline_stages()        # This is the method that defines all the pipelined functions; and issues cmdline.run(...)
-    pl.clear()                  # 
-    objTempDir.dissolve()       # ...behind the scenes: shutil.rmtree(self.name)
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # This is the method that defines all the pipelined functions; and issues cmdline.run(...)
+    pl.pipeline_stages()        
+    pl.clear()
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 if __name__ == '__main__':
     main_prog()

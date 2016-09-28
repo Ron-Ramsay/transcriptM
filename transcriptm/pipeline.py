@@ -24,7 +24,8 @@
 # 43: run target_tasks." 
 # 44: removed ruffus.follows dependency from view_raw_data and view_processed_data." 
 # 45: naming arguments to ruffus functions. Implementing end_stages." 
-print "47: fixed up the previous misspelling of task_func*t*" 
+# 47: fixed up the previous misspelling of task_func*t*" 
+print "51: Removed all `exit(1)` after raise `Exception`."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -37,16 +38,19 @@ import re            # regular expression operations.
 import string        # common string operations.
 import collections   # high-performance container datatypes.
 import shutil        # high-level file operations.
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # External, non-standard modules
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 import extern        # version of Python's `subprocess`. See https://pypi.python.org/pypi/extern/0.1.0
 import numpy         # array processing for numbers, strings, records, objects. See http://www.numpy.org/
 import ruffus        # light-weight computational pipeline management. See http://www.ruffus.org.uk
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Locally written modules
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 from monitoring import Monitoring  # implements class `Monitoring`. (Locally-written module).
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Constants
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -99,6 +103,7 @@ def Valid_stages_str():
     for line in sorted(Valid_stages_dict().items()):
         lines += " ".join(line) + "\n"
     return lines
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # the pipeline class
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -107,14 +112,13 @@ class full_tm_pipeline:
         """
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def __init__(self, args):
-        """ (routines automatically executed upon instantiation of an instance of this class).
-            """
+        """ (routines automatically executed upon instantiation of an instance of this class). """
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_target_tasks():
             """ generates `self.target_tasks`, a list parsed from `self.args.end_stages`, 
                 (where those stages have already been validated as being a valid ID or Name).
                 The resulting list is intended to be passed to ruffus' pipeline.run. 
-                """
+            """
             self.target_tasks = []
             if self.args.end_stages:
                 valid_stages = Valid_stages_dict() # gets a working copy.
@@ -125,20 +129,18 @@ class full_tm_pipeline:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_ref_genome_phiX():
             """ instantiates and validates `self.ref_genome_phiX`: the filepath of the reference genome file (PhiX).
-                """
+            """
             self.ref_genome_phiX = os.path.join(self.args.db_path, '2-PhiX/phiX.fa')
             if not os.path.isfile(self.ref_genome_phiX):
-                raise Exception("The subdirectory 2-PhiX/ or the file %s does not exist in %s (db_path provided)"
-                                %(os.path.basename(self.ref_genome_phiX), self.args.db_path))
-                exit(1)
+                raise Exception(
+                    "The subdirectory 2-PhiX/ or the file %s does not exist in %s (db_path provided)"\
+                    %(os.path.basename(self.ref_genome_phiX), self.args.db_path))
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_list_gff():
-            """ instantiates and validates `self.list_gff`: the list of gff files.
-                """
+            """ instantiates and validates `self.list_gff`: the list of gff files. """
             self.list_gff = list(numpy.sort(self.get_files(self.args.dir_bins , '.gff')))
             if len(set([os.path.basename(x) for x in self.list_gff])) < len(self.list_gff):
                 raise Exception ("--dir_bins args \nWarning: some gff files have the same name")
-                exit(1)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_alias_pe():
             """ populates dict `self.alias_pe` of aliases symbolically linked filenames to the paired-end reads.
@@ -148,42 +150,40 @@ class full_tm_pipeline:
                 value: original filenames (of metatranscriptomic reads), as listed in argument `paired_end`.
                 e.g. {'/srv/home/s4293029/tm_working/sample-0_R1.fq.gz': 
                         '/srv/home/s4293029/tm_data/20120800_P2M.1.fq.gz', ...}
-                """
+            """
             self.alias_pe = {}  
             for i in range(int(len(self.args.paired_end)/2)): # Loop an index through the pairs in the `paired_end` list.
                 self.alias_pe[os.path.join(self.args.working_dir, 'sample-'+str(i)+'_R1.fq.gz')] = \
                     self.args.paired_end[2*i]
                 self.alias_pe[os.path.join(self.args.working_dir, 'sample-'+str(i)+'_R2.fq.gz')] = \
                     self.args.paired_end[2*i+1]
-#            print "Debug: self.alias_pe:", self.alias_pe
-#            {'/srv/home/s4293029/tm_working/sample-0_R1.fq.gz': '/srv/home/s4293029/tm_data/20120800_P2M.1.fq.gz', 
-#            '/srv/home/s4293029/tm_working/sample-0_R2.fq.gz': '/srv/home/s4293029/tm_data/20120800_P2M.2.fq.gz'}
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_prefix_pe():
             """ populates dictionary `self.prefix_pe`:
-                index: "sample-n", where 'n' is the zero-based counter for each *pair* of filenames passed in `paired_end`. 
-                value: descriptor of the longest common substring (trimmed of some types of trailing characters) for the pair of filenames.
+                index: "sample-n", where 'n' is the zero-based counter for each *pair* of filenames passed in
+                `paired_end`. 
+                value: descriptor of the longest common substring (trimmed of some types of trailing characters) 
+                for the pair of filenames.
                 e.g. {'sample-0': '20120800_P2M', ...}
                 Dependencies: self.args.paired_end.
-                """
-            self.prefix_pe = {}
-            for  i in range(int(len(self.args.paired_end)/2)): # Loop an index through the pairs in the `paired_end` list.
-                ###! VARIABLE HAS UNWANTED SCOPE: `value`; (but is only used here).
-                # Find the longest common substring between the pair of filenames: 
-                value = self.longest_common_substring(os.path.basename(self.args.paired_end[2*i]),
-                                                      os.path.basename(self.args.paired_end[2*i+1]))
+            """
+            self.prefix_pe = {} # Initialize the variable to populate.
+            # Loop through the paired-end read filenames, in pairs.
+            for  i in range(int(len(self.args.paired_end)/2)):
+                # Find the longest common substring between the pair of filenames.
+                value = self.longest_common_substring(
+                    os.path.basename(self.args.paired_end[2*i]),
+                    os.path.basename(self.args.paired_end[2*i+1]))
                 # Trim the `value` to be rid of various trailing characters:
-                if value.endswith(('.','_','-'), 0): ###! ARGUMENT NOT REQUIRED(?): i.e. the `0`.
+                if value.endswith(('.', '_', '-')):
                     value=value[:-1]  
-                elif value.endswith(('_R','-R','.R'), 0): ###! ARGUMENT NOT REQUIRED(?): i.e. the `0`.
+                elif value.endswith(('_R', '-R', '.R')):
                     value=value[:-2]                               
-                self.prefix_pe['sample-'+str(i)] = value
+                self.prefix_pe['sample-' + str(i)] = value
             # Verify that no pairs were parsed down to the same descriptor:
-            ###! IMPROVEMENT POSSIBLE: Below, when raising an error, show the user which filenames clashed. 
             if len(set(self.prefix_pe.values())) < int(len(self.args.paired_end)/2):
                 print [item for item, count in collections.Counter(self.prefix_pe.values()).items() if count > 1]
-                raise Exception ("2 sets of paired-ends files have the same prefix. Rename one set. \n")
-                exit(1)
+                raise Exception ("Two sets of paired-ends files have the same prefix. Rename one set.")
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_tot_pe():
             """ populates dictionary `self.tot_pe`:
@@ -193,19 +193,21 @@ class full_tm_pipeline:
                 value: the count of reads.
                 e.g. {'20120800_P2M': 815272, ...}
                 Dependencies: self.args.paired_end, self.prefix_pe.
-                """
+            """
             self.tot_pe = {}
             for i in range(int(len(self.args.paired_end)/2)):
-                ###! ACCURACY?: Is dividing the number of lines in the file by for completely accurate? e.g. Could the file have comment lines? 
+                ###! ACCURACY?: Is dividing the number of lines in the file by for completely accurate? 
+                ###!  e.g. Could the file have comment lines? 
                 count = int(subprocess.check_output("zcat %s | wc -l " % \
-                                                (self.args.paired_end[2*i]), shell=True).split(' ')[0])/4 
+                        (self.args.paired_end[2*i]), shell=True).split(' ')[0])/4 
                 self.tot_pe[self.prefix_pe['sample-'+str(i)]]=count
-                self.prt_progress( \
+                self.prt_progress(\
                     self.prefix_pe['sample-'+str(i)], 'raw data', 'FastQC-check', 'raw reads', str(count), '100.00 %')
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_SUBDIRS():
             """ sets up constant strings representing basename strings of subdirectories to be created 
-                under the output directory, and clears them from previous runs. """
+                under the output directory, and clears them from previous runs. 
+            """
             # names of subdirectories:
             self.SUBDIR_log                = os.path.join(self.args.output_dir, "log")
             self.SUBDIR_FastQC_raw         = os.path.join(self.args.output_dir, "FastQC_raw")
@@ -241,7 +243,7 @@ class full_tm_pipeline:
                 Variables `self.logger` and `self.logging_mutex` are meant to be passed as parameters to each Ruffus job.  
                     `logger`: forwards logging calls across jobs.
                     `logging_mutex`: prevents different jobs which are logging simultaneously from being jumbled up.
-                """       
+            """       
             self.logger, self.logging_mutex = ruffus.cmdline.setup_logging(__name__, args.log_file, args.verbose)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ''' function control: '''
@@ -258,13 +260,14 @@ class full_tm_pipeline:
         V_SUBDIRS()
         # Set up logging.
         setup_logging()              
+
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Helper functions
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def re_symlink(self, input_file, soft_link_name, logger, logging_mutex):
         """ (helper): relinks soft symbolic link if necessary.
             (This function from the ruffus website: http://www.ruffus.org.uk/faq.html?highlight=re_symlink) 
-            """
+        """
         # Guard against soft linking to oneself: Disastrous consequences of deleting the original files
         if input_file == soft_link_name:
             logger.debug("Warning: No symbolic link made. " + \
@@ -289,8 +292,7 @@ class full_tm_pipeline:
             soft_link_name)
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def get_files(self, directory, extension):
-        """ (helper): returns a list of files with a specific extension in a directory and its subdirectories.
-            """
+        """ (helper): returns a list of files with a specific extension in a directory and its subdirectories. """
         list_files = [] 
         for root, dirs, files in os.walk(directory):
             for f in files:
@@ -301,7 +303,7 @@ class full_tm_pipeline:
     def has_index(self, f, list_extension):
         """ (helper): check if a file f has index 
             (if its directory also contains files ending with extensions given in a list).
-            """
+        """
         index = True 
         for ext in list_extension:
             if not os.path.exists(f + ext):
@@ -310,8 +312,7 @@ class full_tm_pipeline:
         return index
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def longest_common_substring(self, S1, S2):
-        """ (helper): returns the longest common substring between 2 strings.
-            """
+        """ (helper): returns the longest common substring between 2 strings. """
         M = [[0]*(1+len(S2)) for i in range(1+len(S1))]
         longest, x_longest = 0, 0
         for x in range(1,1+len(S1)):
@@ -328,14 +329,14 @@ class full_tm_pipeline:
     def prt_progress(self, name_sample, p2, p3, p4, p5, p6):
         """ prints out the provided parameters as a line formated in standard column widths.
             This function probably belongs in module Monitoring, but is put here until that is sorted out.
-            """
+        """
         print "{0:20} {1:16} {2:16} {3:20} {4:>12}  {5:>8}".format(name_sample, p2, p3, p4, p5, p6)
+
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Pipeline Stages
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def pipeline_stages(self):
-        ''' defines all the pipelined functions and runs them.
-            '''
+        """ defines all the pipelined functions and runs them. """
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: STEP N_1
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -359,8 +360,7 @@ class full_tm_pipeline:
             self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def trimmomatic(input_files, output_file, log, logger, logging_mutex): # Stage 2a
-            """ Trimmomatic. Trim and remove adapters of paired reads
-                """
+            """ Trimmomatic. Trim and remove adapters of paired reads. """
             if len(input_files) != 2:
                 raise Exception("One of read pairs %s missing" % (input_files,))  
             cmd = "trimmomatic PE "
@@ -394,8 +394,7 @@ class full_tm_pipeline:
                     str(processed_reads), stat.get_tot_percentage(processed_reads))
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def phiX_map(input_files, output_files, logger, logging_mutex): # Stage 3a
-            """ BamM make. Map all reads against PhiX genome.
-                """
+            """ BamM make. Map all reads against PhiX genome. """
             cmd = "bamm make -d %s -c %s %s -s %s %s -o %s --threads %d -K --quiet" %( \
                     self.ref_genome_phiX,
                     input_files[0],
@@ -410,8 +409,7 @@ class full_tm_pipeline:
             extern.run(cmd)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def phiX_ID(input_files, output_files, logger, logging_mutex): # Stage 3b
-            """ Samtools. Get the IDs of PhiX reads
-                """
+            """ Samtools. Get the IDs of PhiX reads """
             cmd = "samtools view -F4 %s | awk {'print $1'} > %s "%(input_files, output_files)
             with logging_mutex:
                 logger.info("Extract ID of phiX reads in %s" %(input_files))
@@ -419,8 +417,7 @@ class full_tm_pipeline:
             extern.run(cmd)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def phiX_concat_ID(input_files, output_file, basename, logger, logging_mutex): # Stage 3c
-            """ Concatenate all PhiX ID found previously.
-                """
+            """ Concatenate all PhiX ID found previously. """
             cmd = "cat %s %s %s | uniq > %s" %(
                     input_files[0],
                     input_files[1],
@@ -448,8 +445,7 @@ class full_tm_pipeline:
             pass
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def phiX_extract(input_files, output_files, logger, logging_mutex): # Stage 3e
-            """ Remove PhiX reads
-                """
+            """ Remove PhiX reads """
             try:
                 cmd = "fxtract -S -H -f %s -z -v %s > %s" %(input_files[1], input_files[0], output_files)
                 with logging_mutex:
@@ -468,8 +464,7 @@ class full_tm_pipeline:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Third step in the QC process: remove rRNA, tRNA ...
         def sortmerna(input_files, output_files, ncRNA_files, logger, logging_mutex): # Stage 4
-            """ SortMeRNA. Remove non-coding RNA
-                """
+            """ SortMeRNA. Remove non-coding RNA. """
             cmd = "sortmerna --ref %s --reads %s --aligned %s --other %s --fastx -a %d --log" %( \
                     self.args.path_db_smr,
                     input_files,
@@ -486,8 +481,7 @@ class full_tm_pipeline:
         # mapping the reads to reference genome       
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def concat_for_mapping(input_files, output_files, ID_single, logger, logging_mutex): # Stage 5a
-            """ Prepare .fq files for the mapping stage
-                """
+            """ Prepare .fq files for the mapping stage. """
             cmd_ID = "comm -3 <(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s |sort) <(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s | sort) | awk  '{print $1 $2}' > %s" % \
                     (input_files[0], input_files[1], ID_single)            
 #            cmd_ID = "comm -3 <(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s |sort) " + \
@@ -541,8 +535,7 @@ class full_tm_pipeline:
         #2. only one alignment per read is kept: the secondary and supplementary are removed
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def map2ref(input_files, output_file, bams, flagstat, logger, logging_mutex): # Stage 5b
-            """ BamM make. Map all metatranscriptomics reads against metagenomics contigs
-                """
+            """ BamM make. Map all metatranscriptomics reads against metagenomics contigs. """
             if self.has_index(input_files[1], ['.amb','.bwt','.ann','.pac','.sa']):
                 # index already exists -> bamm Kept
                 index_exists = 'K'
@@ -582,8 +575,7 @@ class full_tm_pipeline:
                 str(mapped_reads), stat.get_tot_percentage(mapped_reads))
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def mapping_filter(input_file, output_file, flagstat, logger, logging_mutex): # Stage 5c
-            """ BamM filter. Select reads which are mapped with high stringency
-                """
+            """ BamM filter. Select reads which are mapped with high stringency. """
             if self.args.no_mapping_filter :  
                 pass 
             else:
@@ -613,8 +605,7 @@ class full_tm_pipeline:
                     str(mapped_reads_f), stat.get_tot_percentage(mapped_reads_f))
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def bam2normalized_cov(input_file, output_file, coverage_file, dir_bins, logger, logging_mutex): # Stage 6a
-            """ Dirseq (compute coverage values) +  coverage2normalized_cov
-                """
+            """ Dirseq (compute coverage values) +  coverage2normalized_cov. """
             #                                                                       #
             ## add control! contigs in gff files must be present in metaG_contigs  ##
             #                   
@@ -653,8 +644,7 @@ class full_tm_pipeline:
                 extern.run(cmd1)                
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def bam2raw_count(input_file, output_file, list_gff, logger, logging_mutex): # Stage 6b  
-            """ Bedtools (count the number of mapped reads per gene)
-                """
+            """ Bedtools (count the number of mapped reads per gene). """
             for i in range(len(self.list_gff)):
                 gff_no_fasta= tempfile.NamedTemporaryFile(prefix='transcriptm', suffix='.gff')
                 cmd0 = "sed '/^##FASTA$/,$d' %s > %s" %(self.list_gff[i], gff_no_fasta.name)
@@ -671,8 +661,7 @@ class full_tm_pipeline:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Concatenate all the normalized_cov results in a table
         def transcriptM_table (input_files, output_file, logger, logging_mutex): # Stage 7a
-            """ Create one table that contains RPKM values for each gene of each bin for the different samples.
-                """
+            """ Create one table that contains RPKM values for each gene of each bin for the different samples. """
             input_files = list(set(input_files))      
             if len(input_files) == 0: 
                 raise Exception("Incorrect input detected. Likely causes: " + \
@@ -730,7 +719,7 @@ class full_tm_pipeline:
         # Concatenate all the raw count in a table
         def raw_count_table(input_files, output_file, logger, logging_mutex): # Stage 7b
             """ Create one table that contains raw count values for each gene of each bin for the different samples.
-                """
+            """
             input_files = list(set(input_files))          
             count_col = [list([]) for _ in xrange(int(len(self.args.paired_end)/2)+3)]       
             # headers of cols ->  0, n-1, n
@@ -794,8 +783,7 @@ class full_tm_pipeline:
             extern.run(cmd)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def view_processed_data(input_file, soft_link_name, logger, logging_mutex): # Stage 2aR
-            """ Create a fastQC report in the output directory
-                """
+            """ Create a fastQC report in the output directory. """
             cmd = "fastqc %s -o %s --threads %d --quiet; rm %s/*.zip" %(
                     ' '.join(input_file),
                     self.SUBDIR_FastQC_processed, ###! IMPROVE: Consider passing as function parameter.
@@ -807,8 +795,7 @@ class full_tm_pipeline:
             extern.run(cmd)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def save_log(input_files, output_files, logger, logging_mutex): # Stage 6R1
-            """ Save the log files, generated for different stages of the pipeline (in the temp directory).
-                """
+            """ Save the log files, generated for different stages of the pipeline (in the temp directory). """
             cmd = "cp %s %s"   %(input_files, output_files)    
             with logging_mutex:
                 logger.info("Save log files: %(input_files)s" % locals())
@@ -816,8 +803,7 @@ class full_tm_pipeline:
             extern.run(cmd)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def logtable(input_files, output_file, basename): # Stage 6R2
-            """ Sums up the count of reads which are kept after each step.
-                """
+            """ Sums up the count of reads which are kept after each step. """
             name_sample = self.prefix_pe[basename]
             stat = Monitoring(self.tot_pe[name_sample])          
             # raw
@@ -862,8 +848,7 @@ class full_tm_pipeline:
                 numpy.savetxt(output_file, numpy.transpose(tab), delimiter='\t', fmt="%s") 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def concatenate_logtables(input_files, output_file, logger, logging_mutex): # Stage 6R3
-            """ Concatenate the summuries of reads distribution from all samples.
-                """
+            """ Concatenate the summuries of reads distribution from all samples. """
             input_files = (' ').join(input_files)
             h = ["sample name","step name","tool used","input data","reads count","% total","% previous step"]  
             header = ('\t').join(h)            
@@ -874,14 +859,14 @@ class full_tm_pipeline:
             extern.run(cmd)  
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def save_processed_reads(input_file, output_file, logger, logging_mutex): # Stage 5aR
-            """ Copy the processed reads in the output directory.
-                """
+            """ Copy the processed reads in the output directory. """
             for i in range(3):
                 cmd = "cp %s %s " %(input_file[i], output_file[i])
                 with logging_mutex:
                     logger.info("Copy the processed reads %s in the output directory" %(input_file[i]))
                     logger.debug("save_processed_reads: cmdline\n" + cmd)
                 extern.run(cmd)
+
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Build the pipeline.
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -932,13 +917,6 @@ class full_tm_pipeline:
                 self.logger, 
                 self.logging_mutex]
             )
-#        rpl.collate(trimmomatic, # Stage 2a
-#            symlink_metaT,
-#            ruffus.regex("R[12].fq.gz$"),
-#            ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"],
-#            "trimmomatic.log",
-#            self.logger, self.logging_mutex
-#            )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl.subdivide(task_func = phiX_map, # Stage 3a
             input = trimmomatic,
@@ -966,18 +944,7 @@ class full_tm_pipeline:
                 self.logger, 
                 self.logging_mutex]
             )
-#        rpl.collate(phiX_concat_ID, # Stage 3c
-#            phiX_ID, 
-#            ruffus.formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),
-#            '{path[0]}/{BASE[0]}phiX_ID.log','{BASE[0]}',
-#            self.logger, self.logging_mutex
-#        )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#        rpl.subdivide(QC_output, # Stage 3d
-#            trimmomatic,
-#            ruffus.regex(r"trimm_[UP][12].fq.gz"),
-#            ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"]
-#            )
         rpl.subdivide(task_func = QC_output, # Stage 3d
             input = trimmomatic,
             filter = ruffus.regex(r"trimm_[UP][12].fq.gz"),
@@ -1037,14 +1004,6 @@ class full_tm_pipeline:
                 self.logging_mutex]
             )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#        rpl.subdivide(bam2normalized_cov, # Stage 6a
-#            bam_file, 
-#            ruffus.formatter(),
-#            '{path[0]}/*normalized_cov.csv',
-#            '{path[0]}/coverage.csv',
-#            self.args.dir_bins,
-#            self.logger, self.logging_mutex
-#            )
         rpl.subdivide(task_func = bam2normalized_cov, # Stage 6a
             input = bam_file, 
             filter = ruffus.formatter(),
@@ -1056,12 +1015,6 @@ class full_tm_pipeline:
                 self.logging_mutex]
             )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#        rpl.subdivide(bam2raw_count, # Stage 6b
-#            bam_file,ruffus.formatter(),
-#            '{path[0]}/*count.csv',
-#            self.list_gff,
-#            self.logger, self.logging_mutex
-#            )
         rpl.subdivide(task_func = bam2raw_count, # Stage 6b
             input = bam_file,
             filter = ruffus.formatter(),
@@ -1093,8 +1046,6 @@ class full_tm_pipeline:
             extras = [self.logger, self.logging_mutex]
             )\
         .mkdir(self.SUBDIR_FastQC_raw)
-#        .mkdir(self.SUBDIR_FastQC_raw)\
-#        .follows(bam2normalized_cov)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl.transform(task_func = view_processed_data, # Stage 2aR
             input = trimmomatic, 
@@ -1103,8 +1054,6 @@ class full_tm_pipeline:
             extras = [self.logger, self.logging_mutex]
             )\
         .mkdir(self.SUBDIR_FastQC_processed)
-#        .mkdir(self.SUBDIR_FastQC_processed)\
-#        .follows(bam2normalized_cov)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl.collate(task_func = logtable, # Stage 6R2  
             input = save_log, 
@@ -1165,28 +1114,27 @@ class full_tm_pipeline:
     # Post-pipeline activity
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def clear(self):
-        """ tidy-up of the program's output directory, (renames certain files, and deletes a subdirectory),
+        """ tidies-up the program's output directory, (renames certain files, and deletes a subdirectory),
             intended to be performed after the pipeline stages have been run.
-            """
+        """
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def rename_SUBDIRs_content():
-            """ renames all files in output directories with their 'real name'. (???)
-                """
+            """ renames all files in output directories with their prefixes referring to their original name. """
             for subdir in self.SUBDIRS_for_content_renaming:
                 if os.path.exists(subdir):
-                    for f in os.listdir(subdir): # Iterate through each file in that subdirectory, to rename the file.
+                    # Iterate through each file in that subdirectory, to rename the file.
+                    for f in os.listdir(subdir): 
                         original_name = self.prefix_pe.get(f.split('_')[0])
                         # Allow for the case that the file has already been renamed in previous runs.
                         if original_name != None: 
-                            self.prefix_pe[f.split('_')[0]]
-                            f_oldname = os.path.join(subdir, f)          
                             # Replace the first part of the filenames, i.e. up to the first "_",
                             # by the first part of `self.prefix_pe`, i.e. up to the first "_". 
+                            f_oldname = os.path.join(subdir, f)          
                             f_newname = os.path.join(subdir, string.replace(f, f.split('_')[0], original_name))
                             os.rename(f_oldname, f_newname)
-
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def clear_SUBDIRs():
+            """ removes all nominated output directories. """
             for subdir in self.SUBDIRS_for_clearing:
                 try:
                     shutil.rmtree(subdir)

@@ -279,8 +279,13 @@ def main_prog():
     """
     # Initialise a command line parser that is configured with options specific to our program and `ruffus`.
     parser = parser_built_with_ruffus() 
+    
     # Parse the command line.
     args = parser.parse_args()  
+
+    #debug_namespace(args)
+#    (logger, logging_mutex) = cmdline.setup_logging (__name__, args.log_file, args.verbose)    
+
     # Perform further argument validation and creation.
     further_process_args(args)  
     #    debug_namespace(args)

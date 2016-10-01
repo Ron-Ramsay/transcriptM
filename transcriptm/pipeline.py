@@ -6,7 +6,7 @@
 # 52: Modified self.pe#normalized_cov_col = [list([]) for _ in xrange(int(len(self.args.paired_end)/2)+3)] to use self.prefix_pe"
 # 55: Implemented JSON for abeyance file storage."
 # 56: Added abeyance storage and retrieval to all stages." 
-print "58: Implemented full halt_after_stage and restart_from_stage."
+print "59: Have tested stopping and restarting at each stage."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -20,25 +20,21 @@ import string        # common string operations.
 import collections   # high-performance container datatypes.
 import shutil        # high-level file operations.
 import json          # JSON, an open-standard format that uses human-readable text to transmit data objects.
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # External, non-standard modules
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 import extern        # version of Python's `subprocess`. See https://pypi.python.org/pypi/extern/0.1.0
 import numpy         # array processing for numbers, strings, records, objects. See http://www.numpy.org/
 import ruffus        # light-weight computational pipeline management. See http://www.ruffus.org.uk
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Locally written modules
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 from monitoring import Monitoring  # implements class `Monitoring`. (Locally-written module).
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Constants   
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 class valid_processes(object):
-    """ provides constants, such as valid stages and functions of the pipeline.
-    """
+    """ provides constants, such as valid stages and functions of the pipeline. """
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     @staticmethod
     def _raw_str_to_dict(raw_data):
@@ -83,7 +79,6 @@ class valid_processes(object):
                 4)    sortmerna
                 5.2)  concat_for_mapping
                 5.5)  map2ref
-                5.7)  mapping_filter
                 6)    bam_processing
                 7)    transcriptM """
         return valid_processes._raw_str_to_dict(raw_data)
@@ -123,7 +118,17 @@ class valid_processes(object):
     @staticmethod
     def valid_stage_ID(stage):
         """ given either a stage ID or stage name, returns the stage ID, or None if not valid. """
-        return valid_processes._dict_to_str_lines(valid_processes.valid_stages_dict())
+        pass
+        if stage[0].isdigit():
+            if stage in valid_processes.valid_stages_dict().keys():
+                return stage
+            else:
+                return None
+        else:
+            for (ID, name) in valid_processes.valid_stages_dict().items():
+                if name == stage:
+                    return ID
+            return None
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     @staticmethod
     def valid_stages_str():
@@ -151,6 +156,11 @@ class pipeline_object:
             self.restart_at = None                
             if self.args.restart_from_stage:
                 self.restart_at = float(valid_processes.valid_stage_ID(self.args.restart_from_stage))
+            print "****"
+            print self.args.halt_after_stage
+            print self.halt_after 
+            print self.args.restart_from_stage
+            print self.restart_at
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_ref_genome_phiX():
             """ instantiates and validates `self.ref_genome_phiX`: the filepath of the reference genome file (PhiX).
@@ -290,7 +300,7 @@ class pipeline_object:
             #print "self.args.verbose:", self.args.verbose, type(self.args.verbose)
             #print "self.args.verbose:", self.args.verbose, type(args.verbose)
             #self.logger, self.logging_mutex = ruffus.cmdline.setup_logging(__name__, args.log_file, self.args.verbose)
-            self.logger, self.logging_mutex = ruffus.cmdline.setup_logging(__name__, args.log_file, 0)
+            self.logger, self.logging_mutex = ruffus.cmdline.setup_logging(__name__, args.log_file, 1)
             #print type(self.logger)
             #self.logger.setLevel(logging.INFO) #logging.DEBUG
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1018,17 +1028,28 @@ class pipeline_object:
             def retrieve_bam2normalized_cov(p1,p2,p3):
                 return abeyance.retrieve(p1,p2,p3) # See for meaningful description.
             @staticmethod
+            def retrieve_bam2raw_count(p1,p2,p3):
+                return abeyance.retrieve(p1,p2,p3) # See for meaningful description.
+            @staticmethod
             def retrieve_transcriptM_table(p1,p2,p3):
+                return abeyance.retrieve(p1,p2,p3) # See for meaningful description.
+            @staticmethod
+            def retrieve_raw_count_table(p1,p2,p3):
                 return abeyance.retrieve(p1,p2,p3) # See for meaningful description.
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Restarting and halting of stages.
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        def require_run_stage(stage_ID):
-            return \
-                not((self.restart_at and self.restart_at < stage_ID) or \
-                (self.halt_after and self.halt_after > stage_ID))
-        def require_stage_restart(stage_ID):
-            return self.restart_at and self.restart_at == stage_ID
+        def require_run_stage(stage_num):
+            ans = not ( \
+                (self.restart_at and self.restart_at > round(stage_num, 1)) or \
+                (self.halt_after and self.halt_after < round(stage_num, 1)))
+            print "*** testing required run for stage num:", stage_num, ans
+            return ans
+
+        def require_stage_restart(stage_num):
+            ans = self.restart_at and (self.restart_at == round(stage_num, 1))
+            print "*** testing restart      for stage num:", stage_num, ans
+            return ans
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Build the pipeline.
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1109,8 +1130,7 @@ class pipeline_object:
                     "{path[0]}/phiX.{BASE[0]}U1.bam",
                     "{path[0]}/phiX.{BASE[0]}U2.bam"], 
                 extras = [self.logger, self.logging_mutex]
-                )\
-            .follows(abeyance.store_trimmomatic)
+                )
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.transform(task_func = phiX_ID, # Stage 3b
                 input = phiX_map,
@@ -1129,7 +1149,7 @@ class pipeline_object:
                 )
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.subdivide(task_func = QC_output, # Stage 3d
-                input = trimmomatic,
+                input = decide_trimmomatic,
                 filter = ruffus.regex(r"trimm_[UP][12].fq.gz"),
                 output = ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"]
                 )
@@ -1364,10 +1384,21 @@ class pipeline_object:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 7
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        if require_stage_restart(7):
+            decide_bam2normalized_cov = abeyance.retrieve_bam2normalized_cov(
+                os.path.join(self.args.working_dir, 'abeyance_bam2normalized_cov.output'), 
+                self.logger, self.logging_mutex)
+            decide_bam2raw_count = abeyance.retrieve_bam2raw_count(
+                os.path.join(self.args.working_dir, 'abeyance_bam2raw_count.output'), 
+                self.logger, self.logging_mutex)
+        else:
+            decide_bam2normalized_cov = bam2normalized_cov
+            decide_bam2raw_count = bam2raw_count
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if require_run_stage(7):
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.merge(task_func = transcriptM_table, # Stage 7a # Concatenate all the normalized_cov results in a table
-                input = bam2normalized_cov, 
+                input = decide_bam2normalized_cov, 
                 output = os.path.join(self.args.output_dir, 
                                       os.path.basename(self.args.output_dir)+'_NORM_COVERAGE.csv'),
                 extras = [self.logger, self.logging_mutex]
@@ -1381,7 +1412,7 @@ class pipeline_object:
                 )
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.merge(task_func = raw_count_table, # Stage 7b # Concatenate all the raw count in a table
-                input = bam2raw_count,
+                input = decide_bam2raw_count,
                 output = os.path.join(self.args.output_dir, os.path.basename(self.args.output_dir)+'_COUNT.csv'),
                 extras = [self.logger, self.logging_mutex]
                 )\

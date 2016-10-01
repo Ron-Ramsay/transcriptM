@@ -112,18 +112,17 @@ def parser_built_with_ruffus():
             "An intermediate stage; after this stage is completed, the pipeline run will halt.\n"\
             "Available options are as follows. Use either the ID (without the bracket) OR the text-string:\n"\
             + tm_pipeline.valid_processes.valid_stages_str() +\
-            "IMPORTANT: The pipeline may later be restarted from this point, but...\n"\
-            "(i) the same `--paired_end` arguments must be supplied to transcriptm script, "\
-            "in exactly the SAME ORDER as before, else mismatching will occur;\n"\
-            "(ii) the `--working_dir` argument must be specified explicitely, "\
-            "and the data must be retained in the specified directory between runs.")
+            "IMPORTANT: The pipeline may later be restarted from the next stage, but note:\n "\
+            "(i) the same `--paired_end` arguments must be supplied "\
+            "in exactly the SAME ORDER as before,\n else mismatching will occur; and "\
+            "(ii) the `--working_dir` argument must be specified explicitly,\n"\
+            " and the data must be retained in the specified directory between runs.")
 
     parser.add_argument("--restart_from_stage", dest="restart_from_stage",
             help=\
-            "An intermediate stage from which to use previously saved data in the `--working_dir` "\
-            "to restart the pipeline to proceed from the following stage.\n"\
-            "Available options are as per option `--halt_after_stage` (see).\n"\
-            "NB. See important notes from `--halt_after_completing`.")
+            "An intermediate stage to restart from, using previously saved data in the `--working_dir` directory.\n"\
+            "Available options are the same as per option `--halt_after_stage`.\n"\
+            "NB. See very important notes in the help for option `--halt_after_completing`.")
 
     # General option: TranscriptM database path:
     db_path=None    
@@ -142,7 +141,11 @@ def parser_built_with_ruffus():
 
     # General option: working directory:
     parser.add_argument("--working_dir", dest="working_dir", 
-            help="Working directory. If not specified, a temporary directory is dynamically created and dispossed of.")
+            help=\
+            "Working directory (which will be created if it does not exist).\n"\
+            "Specifying a working directory is essential if `--halt_after_stage` or `--restart_from_stage`\n"\
+            " are required in this run or a future restarted run.\n"\
+            "If a working directory is not specified, a temporary directory is dynamically created and disposed of.")
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Trimmomatic options:
@@ -253,15 +256,18 @@ def further_process_args(args):
                 "`--halt_after_stage` or `--restart_from_stage` are used.")
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Ensure the halt-stage is not earlier in the pipeline than the restart-stage.
-        if (args.halt_after_stage and args.restart_from_stage) and \
-                float(tm_pipeline.valid_processes.valid_stage_ID(args.halt_after_stage)) > \
-                float(tm_pipeline.valid_processes.valid_stage_ID(args.restart_from_stage)
+        if (args.halt_after_stage and args.restart_from_stage):
+            print "***", tm_pipeline.valid_processes.valid_stage_ID(args.halt_after_stage)
+            print "***", tm_pipeline.valid_processes.valid_stage_ID(args.restart_from_stage)
+            if \
+              float(tm_pipeline.valid_processes.valid_stage_ID(args.halt_after_stage)) < \
+              float(tm_pipeline.valid_processes.valid_stage_ID(args.restart_from_stage)
                 ):
-            raise Exception(
-                "The `--halt_after_stage` <{0} {1}> must not be earlier in the pipeline than\n"+
-                "the `--restart_from_stage` <{2} {3}>.".format(
+                raise Exception(
+                "\nThe `--halt_after_stage` <{0} {1}> must not be earlier in the pipeline than ".format(
                 tm_pipeline.valid_processes.valid_stage_ID(args.halt_after_stage), 
-                tm_pipeline.valid_processes.valid_stages_dict().get(args.halt_after_stage, args.halt_after_stage), 
+                tm_pipeline.valid_processes.valid_stages_dict().get(args.halt_after_stage, args.halt_after_stage)) +\
+                "the `--restart_from_stage` <{0} {1}>.".format(
                 tm_pipeline.valid_processes.valid_stage_ID(args.restart_from_stage), 
                 tm_pipeline.valid_processes.valid_stages_dict().get(args.restart_from_stage, args.restart_from_stage))
                 )

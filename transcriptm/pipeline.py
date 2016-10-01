@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Developer's temporary playground
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -6,7 +6,7 @@
 # 52: Modified self.pe#normalized_cov_col = [list([]) for _ in xrange(int(len(self.args.paired_end)/2)+3)] to use self.prefix_pe"
 # 55: Implemented JSON for abeyance file storage."
 # 56: Added abeyance storage and retrieval to all stages." 
-print "57: Separated pipeline build and pipeline run."
+print "58: Implemented full halt_after_stage and restart_from_stage."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -36,81 +36,121 @@ from monitoring import Monitoring  # implements class `Monitoring`. (Locally-wri
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Constants   
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-def Valid_stages_dict():
-    """ returns a dictionary of valid stage names, indexed by an identifier. """
-    Separator = ")" # constant.
-    # For easy pasting of data... format: identifier that must begin with a digit; ")"-separator; stage_name:
-    raw_data = \
-        """ 1a) symlink_metaT
-            1aR) view_raw_data
-            1b) symlink_metaG
-            1c) symlink_metaG_index
-            2a) trimmomatic
-            2St) store_trimmomatic
-            2aR) view_processed_data
-            3a) phiX_map
-            3b) phiX_ID
-            3c) phiX_concat_ID
-            3d) QC_output
-            3e) phiX_extract
-            3A) save3
-            4) sortmerna
-            4A) abeyance4_sortmerna
-            5a) concat_for_mapping
-            5aR) save_processed_reads
-            5b) map2ref
-            5c) mapping_filter
-            6a) bam2normalized_cov
-            6b) bam2raw_count
-            6R1) save_log
-            6R2) logtable
-            6R3) concatenate_logtables
-            7a) transcriptM_table
-            7b) raw_count_table """
-    # Transform the raw data into a dictionary and return that dictionary:
-    stages_dict = {} # Initialize the dictionary to return.
-    for line in raw_data.split("\n"):
-        # Extract the fields from the line:        
-        fields = line.split(Separator)
-        assert(len(fields) == 2) # Ensure no extra separators in the line.
-        # Name the fields:
-        stage_id = fields[0].strip()
-        stage_name = fields[1].strip()
-        assert(len(stage_id.split()) == 1) # Ensure no embedded spaces in the field.
-        assert(len(stage_name.split()) == 1) # Ensure no embedded spaces in the field.
-        # Add the fields to the dictionary:
-        stages_dict[stage_id] = stage_name
-    return stages_dict
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-def Valid_stages_str():
-    """ returns a single string of sorted valid stages, each line showing a valid stage and name. """
-    lines = "" # Intitialize return string. 
-    for line in sorted(Valid_stages_dict().items()):
-        lines += " ".join(line) + "\n"
-    return lines
-
+class valid_processes(object):
+    """ provides constants, such as valid stages and functions of the pipeline.
+    """
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    @staticmethod
+    def _raw_str_to_dict(raw_data):
+        """ (helper): parses `raw_data`--i.e. lines in the format of "ID)name"--, to return a dictionary of 
+            names indexed by ID. 
+        """
+        Separator = ")" # constant.
+        # For easy pasting of data... format: identifier that must begin with a digit; ")"-separator; name:
+        # Transform the raw data into a dictionary and return that dictionary:
+        d = {} # Initialize the dictionary to return.
+        for line in raw_data.split("\n"):
+            # Extract the fields from the line:        
+            fields = line.split(Separator)
+            assert(len(fields) == 2) # Ensure no extra separators in the line.
+            # Name the fields:
+            ID = fields[0].strip()
+            name = fields[1].strip()
+            assert(len(ID.split()) == 1) # Ensure no embedded spaces in the field.
+            assert(len(name.split()) == 1) # Ensure no embedded spaces in the field.
+            # Add the fields to the dictionary:
+            d[ID] = name
+        return d
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    @staticmethod
+    def _dict_to_str_lines(D):
+        """ (helper): returns a single string of sorted dictionary entries, each line showing an ID and name. """
+        lines = "" # Intitialize return string. 
+        for line in sorted(D.items()):
+            lines += "\t".join(line) + "\n"
+        return lines
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    @staticmethod
+    def valid_stages_dict():
+        """ conceptual pipeline stages (constructed for the purposes of segmenting the pipeline for restarts). 
+            Cf. valid_functions. 
+        """
+        # Nb. use only integers or floats for the ID.
+        raw_data = \
+            """ 1)    symlink_metaT
+                2)    trimmomatic
+                3)    phiX
+                4)    sortmerna
+                5.2)  concat_for_mapping
+                5.5)  map2ref
+                5.7)  mapping_filter
+                6)    bam_processing
+                7)    transcriptM """
+        return valid_processes._raw_str_to_dict(raw_data)
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    @staticmethod
+    def valid_functions_dict():
+        """ Python funtion names in the Ruffus pipeline. (constructed for the purposes of 
+            fine control of the pipeline. Cf. valid_stages """
+        raw_data = \
+            """ 1a) symlink_metaT
+                1aR) view_raw_data
+                1b) symlink_metaG
+                1c) symlink_metaG_index
+                2a) trimmomatic
+                2St) store_trimmomatic
+                2aR) view_processed_data
+                3a) phiX_map
+                3b) phiX_ID
+                3c) phiX_concat_ID
+                3d) QC_output
+                3e) phiX_extract
+                3A) save3
+                4) sortmerna
+                5a) concat_for_mapping
+                5aR) save_processed_reads
+                5b) map2ref
+                5c) mapping_filter
+                6a) bam2normalized_cov
+                6b) bam2raw_count
+                6R1) save_log
+                6R2) logtable
+                6R3) concatenate_logtables
+                7a) transcriptM_table
+                7b) raw_count_table """    
+        return valid_processes._raw_str_to_dict(raw_data)
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    @staticmethod
+    def valid_stage_ID(stage):
+        """ given either a stage ID or stage name, returns the stage ID, or None if not valid. """
+        return valid_processes._dict_to_str_lines(valid_processes.valid_stages_dict())
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    @staticmethod
+    def valid_stages_str():
+        """ returns a single string of sorted valid stages, each line showing a valid stage and name. """
+        return valid_processes._dict_to_str_lines(valid_processes.valid_stages_dict())
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    @staticmethod
+    def valid_functions_str():
+        """ returns a single string of sorted valid stages, each line showing a valid stage and name. """
+        return valid_processes._dict_to_str_lines(valid_processes.valid_functions_dict())
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # the pipeline class
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-class full_tm_pipeline:
-    """ a ruffus pipeline implementing all the stages of TranscriptM.
-        """
+class pipeline_object:
+    """ a ruffus pipeline implementing the stages of TranscriptM. """
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def __init__(self, args):
         """ (routines automatically executed upon instantiation of an instance of this class). """
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        def V_target_tasks():
-            """ generates `self.target_tasks`, a list parsed from `self.args.end_stages`, 
-                (where those stages have already been validated as being a valid ID or Name).
-                The resulting list is intended to be passed to ruffus' pipeline.run. 
-            """
-            self.target_tasks = []
-            if self.args.end_stages:
-                valid_stages = Valid_stages_dict() # gets a working copy.
-                for stage in self.args.end_stages:
-                    # If the stage is an ID then use the indexed stage name value, 
-                    # else use the stage which should already be a valid stage name.
-                    self.target_tasks.append(valid_stages.get(stage, stage)) 
+        def V_restart_halt_stages():
+            if self.args.halt_after_stage:
+                self.halt_after = float(valid_processes.valid_stage_ID(self.args.halt_after_stage))
+            else:
+                self.halt_after = None
+            self.restart_at = None                
+            if self.args.restart_from_stage:
+                self.restart_at = float(valid_processes.valid_stage_ID(self.args.restart_from_stage))
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_ref_genome_phiX():
             """ instantiates and validates `self.ref_genome_phiX`: the filepath of the reference genome file (PhiX).
@@ -255,23 +295,19 @@ class full_tm_pipeline:
             #self.logger.setLevel(logging.INFO) #logging.DEBUG
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ''' function control: '''
-        # Store arguments passed.
-        self.args = args             
-        # Generate and Validate derived arguments...
-        V_target_tasks()
+        self.args = args             # Store arguments passed.
+#        V_target_tasks()            # Generate and Validate derived arguments...
+        V_restart_halt_stages()
         V_ref_genome_phiX()
         V_list_gff()
         V_alias_pe()
         V_prefix_pe()
         V_tot_pe()
-        # Handle output subdirectories.
-        V_SUBDIRS()
-        # Set up logging.
-        setup_logging()              
-
+        V_SUBDIRS()                  # Handle output subdirectories.
+        setup_logging()              # Set up logging.
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Helper functions
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Helper objects
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def re_symlink(self, input_file, soft_link_name, logger, logging_mutex):
         """ (helper): relinks soft symbolic link if necessary.
             (This function from the ruffus website: http://www.ruffus.org.uk/faq.html?highlight=re_symlink) 
@@ -782,7 +818,6 @@ class full_tm_pipeline:
         def raw_count_table(input_files, output_file, logger, logging_mutex): # Stage 7b
             """ Create one table that contains raw count values for each gene of each bin for the different samples.
             """
-#            print "************** raw_count_table locals():", locals()
             input_files = list(set(input_files))          
             count_col = [list([]) for _ in xrange(int(len(self.args.paired_end)/2)+3)]       
             # headers of cols ->  0, n-1, n
@@ -901,9 +936,7 @@ class full_tm_pipeline:
                 logger.info("Concatenate summaries: %(input_files)s" % locals())
                 logger.debug("concatenate_logtables: cmdline\n"+cmd)                
             extern.run(cmd)  
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # abeyance class
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         class abeyance(object):
             """ for disk storage and retrieval of output files from tasks in Ruffus pipeline. """
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -939,6 +972,9 @@ class full_tm_pipeline:
             def store_sortmerna(p1,p2,p3,p4):
                 abeyance.store(p1,p2,p3,p4) # See for meaningful description.
             @staticmethod
+            def store_concat_for_mapping(p1,p2,p3,p4):
+                abeyance.store(p1,p2,p3,p4) # See for meaningful description.
+            @staticmethod
             def store_map2ref(p1,p2,p3,p4):
                 abeyance.store(p1,p2,p3,p4) # See for meaningful description.
             @staticmethod
@@ -970,6 +1006,9 @@ class full_tm_pipeline:
             def retrieve_sortmerna(p1,p2,p3):
                 return abeyance.retrieve(p1,p2,p3) # See for meaningful description.
             @staticmethod
+            def retrieve_concat_for_mapping(p1,p2,p3):
+                return abeyance.retrieve(p1,p2,p3) # See for meaningful description.
+            @staticmethod
             def retrieve_map2ref(p1,p2,p3):
                 return abeyance.retrieve(p1,p2,p3) # See for meaningful description.
             @staticmethod
@@ -984,13 +1023,12 @@ class full_tm_pipeline:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Restarting and halting of stages.
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        restart_at = None
-        halt_after = None
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def require_run_stage(stage_ID):
-            return not((restart_at and restart_at < stage_ID) or (halt_after and halt_after > stage_ID))
+            return \
+                not((self.restart_at and self.restart_at < stage_ID) or \
+                (self.halt_after and self.halt_after > stage_ID))
         def require_stage_restart(stage_ID):
-            return restart_at and restart_at == stage_ID
+            return self.restart_at and self.restart_at == stage_ID
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Build the pipeline.
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1127,24 +1165,23 @@ class full_tm_pipeline:
                 extras = [
                     "{path[0]}/{basename[0]}_ncRNA.fq",
                     self.logger, self.logging_mutex]
-                )\
-            .follows(abeyance.store_phiX_extract)
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                )
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.merge(task_func = abeyance.store_sortmerna, 
                 input = sortmerna, 
-                output = os.path.join(self.args.working_dir, 'abeyance4_sortmerna.output'),
+                output = os.path.join(self.args.working_dir, 'abeyance_sortmerna.output'),
                 extras = [self.logger, self.logging_mutex]
                 )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # Stage 5
+        # Stage 5.2
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        if require_stage_restart(5):
+        if require_stage_restart(5.2):
             decide_sortmerna = abeyance.retrieve_sortmerna(
                 os.path.join(self.args.working_dir, 'abeyance_sortmerna.output'), self.logger, self.logging_mutex)
         else:
             decide_sortmerna = sortmerna
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        if require_run_stage(5):
+        if require_run_stage(5.2):
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.collate(task_func = concat_for_mapping, # Stage 5a
                 input = decide_sortmerna,
@@ -1153,9 +1190,14 @@ class full_tm_pipeline:
                 extras = [
                     "ID_single.txt", 
                     self.logger, self.logging_mutex]
-                )\
-            .follows(abeyance.store_sortmerna)
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                )
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.merge(task_func = abeyance.store_concat_for_mapping, 
+                input = concat_for_mapping, 
+                output = os.path.join(self.args.working_dir, 'abeyance_concat_for_mapping.output'),
+                extras = [self.logger, self.logging_mutex]
+                )
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.transform(task_func = save_processed_reads, # Stage 5aR
                 input = concat_for_mapping, 
                 filter = ruffus.formatter(),
@@ -1166,6 +1208,17 @@ class full_tm_pipeline:
                 extras = [self.logger, self.logging_mutex]
                 )\
             .mkdir(self.SUBDIR_processed_reads)
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Stage 5.5
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        if require_stage_restart(5.5):
+            decide_concat_for_mapping = abeyance.retrieve_concat_for_mapping(
+                os.path.join(self.args.working_dir, 'abeyance_concat_for_mapping.output'), 
+                self.logger, self.logging_mutex)
+        else:
+            decide_concat_for_mapping = concat_for_mapping
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        if require_run_stage(5.5):
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.transform(task_func = symlink_metaG, # Stage 1b
                 input = self.args.metaG_contigs, # filename of all contigs from the reference metagenome (in a fasta file).
@@ -1174,7 +1227,7 @@ class full_tm_pipeline:
                 extras = [self.logger, self.logging_mutex]
                 )\
             .mkdir(self.args.working_dir)
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.transform(task_func = symlink_metaG_index, # Stage 1c
                 input = [self.args.metaG_contigs+x for x in ['.amb','.bwt','.ann','.pac','.sa']], 
                 filter = ruffus.formatter(),
@@ -1184,27 +1237,27 @@ class full_tm_pipeline:
             .mkdir(self.args.working_dir)\
             .active_if(self.has_index(self.args.metaG_contigs, ['.amb','.bwt','.ann','.pac','.sa']))
                 # Intended to be used when bwa indexes are present.
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.transform(task_func = map2ref, # Stage 5b
-                input = concat_for_mapping, 
+                input = decide_concat_for_mapping, 
                 filter = ruffus.formatter(r"(.+)/(?P<BASE>.*)_concat_paired_R1.fq"), 
                 add_inputs = ruffus.add_inputs(symlink_metaG),
                 output = "{path[0]}/{BASE[0]}.bam",
                 extras = [
-                    ["{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[0]}.bam",
-                     "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[2]}.bam",
-                     "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+"{BASE[0]}_merged.bam"],
-                    "{path[0]}/{BASE[0]}_mapping.log",
-                    self.logger, self.logging_mutex]
+                ["{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[0]}.bam",
+                 "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[2]}.bam",
+                 "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+"{BASE[0]}_merged.bam"],
+                "{path[0]}/{BASE[0]}_mapping.log",
+                self.logger, self.logging_mutex]
                 )\
             .follows(symlink_metaG_index) # This dependency has been added since v0.3.
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.merge(task_func = abeyance.store_map2ref, 
                 input = map2ref, 
                 output = os.path.join(self.args.working_dir, 'abeyance_map2ref.output'),
                 extras = [self.logger, self.logging_mutex]
                 )
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.transform(task_func = mapping_filter, # Stage 5c
                 input = map2ref,
                 filter = ruffus.formatter('.bam'),
@@ -1213,7 +1266,7 @@ class full_tm_pipeline:
                     "{path[0]}/{basename[0]}_stringency_filter.log", 
                     self.logger, self.logging_mutex]
                 )
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.merge(task_func = abeyance.store_mapping_filter, 
                 input = mapping_filter, 
                 output = os.path.join(self.args.working_dir, 'abeyance_mapping_filter.output'),
@@ -1250,7 +1303,7 @@ class full_tm_pipeline:
 #                bam_file = map2ref 
 #            else: 
 #                bam_file = mapping_filter
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.subdivide(task_func = bam2normalized_cov, # Stage 6a
                 input = decide_bam_file, 
                 filter = ruffus.formatter(),
@@ -1259,15 +1312,14 @@ class full_tm_pipeline:
                     '{path[0]}/coverage.csv',
                     self.args.dir_bins,
                     self.logger, self.logging_mutex]
-                )\
-            .follows(abeyance.store_map2ref)
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                )
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.merge(task_func = abeyance.store_bam2normalized_cov, 
                 input = bam2normalized_cov, 
                 output = os.path.join(self.args.working_dir, 'abeyance_bam2normalized_cov.output'),
                 extras = [self.logger, self.logging_mutex]
                 )
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.subdivide(task_func = bam2raw_count, # Stage 6b
                 input = decide_bam_file,
                 filter = ruffus.formatter(),
@@ -1276,48 +1328,15 @@ class full_tm_pipeline:
                     self.list_gff,
                     self.logger, self.logging_mutex]
                 )
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.merge(task_func = abeyance.store_bam2raw_count, 
                 input = bam2raw_count, 
                 output = os.path.join(self.args.working_dir, 'abeyance_bam2raw_count.output'),
                 extras = [self.logger, self.logging_mutex]
                 )
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # Stage 7
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        if require_run_stage(7):
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.merge(task_func = transcriptM_table, # Stage 7a # Concatenate all the normalized_cov results in a table
-                input = bam2normalized_cov, 
-                output = os.path.join(self.args.output_dir, 
-                                      os.path.basename(self.args.output_dir)+'_NORM_COVERAGE.csv'),
-                extras = [self.logger, self.logging_mutex]
-                )\
-            .mkdir(self.args.output_dir)
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.merge(task_func = abeyance.store_transcriptM_table, 
-                input = transcriptM_table, 
-                output = os.path.join(self.args.working_dir, 'abeyance_transcriptM_table.output'),
-                extras = [self.logger, self.logging_mutex]
-                )
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.merge(task_func = raw_count_table, # Stage 7b # Concatenate all the raw count in a table
-                input = bam2raw_count,
-                output = os.path.join(self.args.output_dir, os.path.basename(self.args.output_dir)+'_COUNT.csv'),
-                extras = [self.logger, self.logging_mutex]
-                )\
-            .mkdir(self.args.output_dir)
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.merge(task_func = abeyance.store_raw_count_table, 
-                input = raw_count_table, 
-                output = os.path.join(self.args.working_dir, 'abeyance_raw_count_table.output'),
-                extras = [self.logger, self.logging_mutex]
-                )
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # Stage 8 (formerly 6?) Reporting?
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        if require_run_stage(8):
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            #! Stage 6 reporting - NEED TO CHECK OUT WHERE THESE SHOULD GO.
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.transform(task_func = save_log, # Stage 6R1
                 input = self.args.working_dir+'/*.log', 
                 filter = ruffus.formatter(".log"),  
@@ -1326,7 +1345,7 @@ class full_tm_pipeline:
                 )\
             .mkdir(self.SUBDIR_log)\
             .follows(bam2normalized_cov)
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.collate(task_func = logtable, # Stage 6R2  
                 input = save_log, 
                 filter = 
@@ -1336,10 +1355,41 @@ class full_tm_pipeline:
                 extras = ['{BASE[0]}']
                 )\
             .mkdir(self.SUBDIR_reads_distribution)
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.merge(task_func = concatenate_logtables, # Stage 6R3
                 input = logtable, 
                 output = os.path.join(self.args.output_dir, 'summary_reads'), 
+                extras = [self.logger, self.logging_mutex]
+                )
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Stage 7
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        if require_run_stage(7):
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.merge(task_func = transcriptM_table, # Stage 7a # Concatenate all the normalized_cov results in a table
+                input = bam2normalized_cov, 
+                output = os.path.join(self.args.output_dir, 
+                                      os.path.basename(self.args.output_dir)+'_NORM_COVERAGE.csv'),
+                extras = [self.logger, self.logging_mutex]
+                )\
+            .mkdir(self.args.output_dir)
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.merge(task_func = abeyance.store_transcriptM_table, 
+                input = transcriptM_table, 
+                output = os.path.join(self.args.working_dir, 'abeyance_transcriptM_table.output'),
+                extras = [self.logger, self.logging_mutex]
+                )
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.merge(task_func = raw_count_table, # Stage 7b # Concatenate all the raw count in a table
+                input = bam2raw_count,
+                output = os.path.join(self.args.output_dir, os.path.basename(self.args.output_dir)+'_COUNT.csv'),
+                extras = [self.logger, self.logging_mutex]
+                )\
+            .mkdir(self.args.output_dir)
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.merge(task_func = abeyance.store_raw_count_table, 
+                input = raw_count_table, 
+                output = os.path.join(self.args.working_dir, 'abeyance_raw_count_table.output'),
                 extras = [self.logger, self.logging_mutex]
                 )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1382,8 +1432,8 @@ class full_tm_pipeline:
     def run_built_pipeline(self):
         assert self.built_pipeline != None, "The pipeline needs to be built before it can be run."
         v = 1 or int(self.args.verbose[0])
-        self.built_pipeline.run(target_tasks = self.target_tasks, logger = self.logger, verbose = v)
-        pass
+        #self.built_pipeline.run(target_tasks = self.target_tasks, logger = self.logger, verbose = v)
+        self.built_pipeline.run(logger = self.logger, verbose = v)
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Post-pipeline activity
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

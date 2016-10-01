@@ -6,7 +6,8 @@
 # Developer's temporary playground
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # 57: Separated pipeline build and pipeline run."
-print "58: Implemented full halt_after_stage and restart_from_stage."
+# 58: Implemented full halt_after_stage and restart_from_stage."
+print "62: renamed valid_processes class to const."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules 
@@ -111,7 +112,7 @@ def parser_built_with_ruffus():
             help=\
             "An intermediate stage; after this stage is completed, the pipeline run will halt.\n"\
             "Available options are as follows. Use either the ID (without the bracket) OR the text-string:\n"\
-            + tm_pipeline.valid_processes.valid_stages_str() +\
+            + tm_pipeline.const.valid_stages_str() +\
             "IMPORTANT: The pipeline may later be restarted from the next stage, but note:\n "\
             "(i) the same `--paired_end` arguments must be supplied "\
             "in exactly the SAME ORDER as before,\n else mismatching will occur; and "\
@@ -222,32 +223,32 @@ def further_process_args(args):
         if args.halt_after_stage: # check this parameter only if it was specified.
             badness = False # initialize flag.
             if args.halt_after_stage[0].isdigit(): # Stage begins with a digit, so is a stage id.
-                if args.halt_after_stage not in tm_pipeline.valid_processes.valid_stages_dict().keys(): 
+                if args.halt_after_stage not in tm_pipeline.const.valid_stages_dict().keys(): 
                     badness = True
             else:
-                if args.halt_after_stage not in tm_pipeline.valid_processes.valid_stages_dict().values():
+                if args.halt_after_stage not in tm_pipeline.const.valid_stages_dict().values():
                     badness = True
             if badness:                    
                 raise Exception(
                     "\nStage <{0}> specified in --halt_after_stage is not valid,\n".format(args.halt_after_stage) +\
                     "i.e. not a valid ID or NAME (choose just either an ID or name) from the following:\n" \
-                     + tm_pipeline.valid_processes.valid_stages_str())
+                     + tm_pipeline.const.valid_stages_str())
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # validate this parameter:
         if args.restart_from_stage: # check this parameter only if it was specified.
             badness = False # initialize flag.
             if args.restart_from_stage[0].isdigit(): # Stage begins with a digit, so is a stage id.
-                if args.restart_from_stage not in tm_pipeline.valid_processes.valid_stages_dict().keys(): 
+                if args.restart_from_stage not in tm_pipeline.const.valid_stages_dict().keys(): 
                     badness = True
             else:
-                if args.restart_from_stage not in tm_pipeline.valid_processes.valid_stages_dict().values():
+                if args.restart_from_stage not in tm_pipeline.const.valid_stages_dict().values():
                     badness = True
             if badness:                    
                 raise Exception(
                     "\nStage <{0}> specified in `--restart_from_stage` is not valid,\n"\
                     .format(args.restart_from_stage) +\
                     "i.e. not a valid ID or NAME (choose just either an ID or name) from the following:\n" \
-                     + tm_pipeline.valid_processes.valid_stages_str())
+                     + tm_pipeline.const.valid_stages_str())
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Check if a working directory needs to be specified.
         if (args.halt_after_stage or args.restart_from_stage) and not args.working_dir:                    
@@ -257,19 +258,19 @@ def further_process_args(args):
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Ensure the halt-stage is not earlier in the pipeline than the restart-stage.
         if (args.halt_after_stage and args.restart_from_stage):
-            print "***", tm_pipeline.valid_processes.valid_stage_ID(args.halt_after_stage)
-            print "***", tm_pipeline.valid_processes.valid_stage_ID(args.restart_from_stage)
+#            print "***", tm_pipeline.const.valid_stage_ID(args.halt_after_stage)
+#            print "***", tm_pipeline.const.valid_stage_ID(args.restart_from_stage)
             if \
-              float(tm_pipeline.valid_processes.valid_stage_ID(args.halt_after_stage)) < \
-              float(tm_pipeline.valid_processes.valid_stage_ID(args.restart_from_stage)
+              float(tm_pipeline.const.valid_stage_ID(args.halt_after_stage)) < \
+              float(tm_pipeline.const.valid_stage_ID(args.restart_from_stage)
                 ):
                 raise Exception(
                 "\nThe `--halt_after_stage` <{0} {1}> must not be earlier in the pipeline than ".format(
-                tm_pipeline.valid_processes.valid_stage_ID(args.halt_after_stage), 
-                tm_pipeline.valid_processes.valid_stages_dict().get(args.halt_after_stage, args.halt_after_stage)) +\
+                tm_pipeline.const.valid_stage_ID(args.halt_after_stage), 
+                tm_pipeline.const.valid_stages_dict().get(args.halt_after_stage, args.halt_after_stage)) +\
                 "the `--restart_from_stage` <{0} {1}>.".format(
-                tm_pipeline.valid_processes.valid_stage_ID(args.restart_from_stage), 
-                tm_pipeline.valid_processes.valid_stages_dict().get(args.restart_from_stage, args.restart_from_stage))
+                tm_pipeline.const.valid_stage_ID(args.restart_from_stage), 
+                tm_pipeline.const.valid_stages_dict().get(args.restart_from_stage, args.restart_from_stage))
                 )
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def V_paired_end():

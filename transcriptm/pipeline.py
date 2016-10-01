@@ -2,8 +2,8 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Developer's temporary playground
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-print "61: (Temporarily) moved def V_tot_pe() to run after the pipeline is constructed and before it is run.
-
+# 61: (Temporarily) moved def V_tot_pe() to run after the pipeline is constructed and before it is run."
+print "62: renamed valid_processes class to const."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -28,9 +28,9 @@ import ruffus        # light-weight computational pipeline management. See http:
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 from monitoring import Monitoring  # implements class `Monitoring`. (Locally-written module).
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Constants   
+# Constants exposed.
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-class valid_processes(object):
+class const(object):
     """ provides constants, such as valid stages and functions of the pipeline. """
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     @staticmethod
@@ -78,7 +78,7 @@ class valid_processes(object):
                 5.5)  map2ref
                 6)    bam_processing
                 7)    transcriptM """
-        return valid_processes._raw_str_to_dict(raw_data)
+        return const._raw_str_to_dict(raw_data)
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     @staticmethod
     def valid_functions_dict():
@@ -110,19 +110,19 @@ class valid_processes(object):
                 6R3) concatenate_logtables
                 7a) transcriptM_table
                 7b) raw_count_table """    
-        return valid_processes._raw_str_to_dict(raw_data)
+        return const._raw_str_to_dict(raw_data)
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     @staticmethod
     def valid_stage_ID(stage):
-        """ given either a stage ID or stage name, returns the stage ID, or None if not valid. """
+        """ given either a stage ID or stage name, returns the stage ID (as a string), or None if not valid. """
         pass
         if stage[0].isdigit():
-            if stage in valid_processes.valid_stages_dict().keys():
+            if stage in const.valid_stages_dict().keys():
                 return stage
             else:
                 return None
         else:
-            for (ID, name) in valid_processes.valid_stages_dict().items():
+            for (ID, name) in const.valid_stages_dict().items():
                 if name == stage:
                     return ID
             return None
@@ -130,12 +130,12 @@ class valid_processes(object):
     @staticmethod
     def valid_stages_str():
         """ returns a single string of sorted valid stages, each line showing a valid stage and name. """
-        return valid_processes._dict_to_str_lines(valid_processes.valid_stages_dict())
+        return const._dict_to_str_lines(const.valid_stages_dict())
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     @staticmethod
     def valid_functions_str():
         """ returns a single string of sorted valid stages, each line showing a valid stage and name. """
-        return valid_processes._dict_to_str_lines(valid_processes.valid_functions_dict())
+        return const._dict_to_str_lines(const.valid_functions_dict())
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # the pipeline class
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -147,17 +147,12 @@ class pipeline_object:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_restart_halt_stages():
             if self.args.halt_after_stage:
-                self.halt_after = float(valid_processes.valid_stage_ID(self.args.halt_after_stage))
+                self.halt_after = float(const.valid_stage_ID(self.args.halt_after_stage))
             else:
                 self.halt_after = None
             self.restart_at = None                
             if self.args.restart_from_stage:
-                self.restart_at = float(valid_processes.valid_stage_ID(self.args.restart_from_stage))
-            print "****"
-            print self.args.halt_after_stage
-            print self.halt_after 
-            print self.args.restart_from_stage
-            print self.restart_at
+                self.restart_at = float(const.valid_stage_ID(self.args.restart_from_stage))
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_ref_genome_phiX():
             """ instantiates and validates `self.ref_genome_phiX`: the filepath of the reference genome file (PhiX).
@@ -1040,12 +1035,13 @@ class pipeline_object:
             ans = not ( \
                 (self.restart_at and self.restart_at > round(stage_num, 1)) or \
                 (self.halt_after and self.halt_after < round(stage_num, 1)))
-            print "*** testing required run for stage num:", stage_num, ans
+            print "*** testing stage {0:<3} : {1}".format(stage_num, "Run" if ans else "(no run)")
+            #print "*** testing whether stage requires     run: {0:<3} {1}".format(stage_num, ans)
             return ans
 
         def require_stage_restart(stage_num):
             ans = self.restart_at and (self.restart_at == round(stage_num, 1))
-            print "*** testing restart      for stage num:", stage_num, ans
+            print "*** testing stage {0:<3} : {1}".format(stage_num, "Restart from here" if ans else "(no restart)")
             return ans
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Build the pipeline.

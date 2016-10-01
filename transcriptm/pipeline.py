@@ -2,11 +2,8 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Developer's temporary playground
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# 51: Removed all `exit(1)` after raise `Exception`."
-# 52: Modified self.pe#normalized_cov_col = [list([]) for _ in xrange(int(len(self.args.paired_end)/2)+3)] to use self.prefix_pe"
-# 55: Implemented JSON for abeyance file storage."
-# 56: Added abeyance storage and retrieval to all stages." 
-print "59: Have tested stopping and restarting at each stage."
+print "61: (Temporarily) moved def V_tot_pe() to run after the pipeline is constructed and before it is run.
+
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -220,24 +217,24 @@ class pipeline_object:
                 print [item for item, count in collections.Counter(self.prefix_pe.values()).items() if count > 1]
                 raise Exception ("Two sets of paired-ends files have the same prefix. Rename one set.")
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        def V_tot_pe():
-            """ populates dictionary `self.tot_pe`:
-                index: descriptor of the longest common substring (trimmed of some types of trailing characters) 
-                    for the pair of filenames;
-                    i.e. corresponds to the values of  dictionary `self.prefix_pe`.
-                value: the count of reads.
-                e.g. {'20120800_P2M': 815272, ...}
-                Dependencies: self.args.paired_end, self.prefix_pe.
-            """
-            self.tot_pe = {}
-            for i in range(int(len(self.args.paired_end)/2)):
-                #! ACCURACY?: Is dividing the number of lines in the file by for completely accurate? 
-                #!  e.g. Could the file have comment lines? 
-                count = int(subprocess.check_output("zcat %s | wc -l " %\
-                            (self.args.paired_end[2*i]), shell=True).split(' ')[0])/4 
-                self.tot_pe[self.prefix_pe['sample-'+str(i)]]=count
-                self.prt_progress(\
-                    self.prefix_pe['sample-'+str(i)], 'raw data', 'FastQC-check', 'raw reads', str(count), '100.00 %')
+#        def V_tot_pe():
+#            """ populates dictionary `self.tot_pe`:
+#                index: descriptor of the longest common substring (trimmed of some types of trailing characters) 
+#                    for the pair of filenames;
+#                    i.e. corresponds to the values of  dictionary `self.prefix_pe`.
+#                value: the count of reads.
+#                e.g. {'20120800_P2M': 815272, ...}
+#                Dependencies: self.args.paired_end, self.prefix_pe.
+#            """
+#            self.tot_pe = {}
+#            for i in range(int(len(self.args.paired_end)/2)):
+#                #! ACCURACY?: Is dividing the number of lines in the file by for completely accurate? 
+#                #!  e.g. Could the file have comment lines? 
+#                count = int(subprocess.check_output("zcat %s | wc -l " %\
+#                            (self.args.paired_end[2*i]), shell=True).split(' ')[0])/4 
+#                self.tot_pe[self.prefix_pe['sample-'+str(i)]]=count
+#                self.prt_progress(\
+#                    self.prefix_pe['sample-'+str(i)], 'raw data', 'FastQC-check', 'raw reads', str(count), '100.00 %')
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_SUBDIRS():
             """ sets up constant strings representing basename strings of subdirectories to be created 
@@ -312,7 +309,7 @@ class pipeline_object:
         V_list_gff()
         V_alias_pe()
         V_prefix_pe()
-        V_tot_pe()
+        #V_tot_pe()
         V_SUBDIRS()                  # Handle output subdirectories.
         setup_logging()              # Set up logging.
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1462,6 +1459,28 @@ class pipeline_object:
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def run_built_pipeline(self):
         assert self.built_pipeline != None, "The pipeline needs to be built before it can be run."
+
+
+        def V_tot_pe():
+            """ populates dictionary `self.tot_pe`:
+                index: descriptor of the longest common substring (trimmed of some types of trailing characters) 
+                    for the pair of filenames;
+                    i.e. corresponds to the values of  dictionary `self.prefix_pe`.
+                value: the count of reads.
+                e.g. {'20120800_P2M': 815272, ...}
+                Dependencies: self.args.paired_end, self.prefix_pe.
+            """
+            self.tot_pe = {}
+            for i in range(int(len(self.args.paired_end)/2)):
+                #! ACCURACY?: Is dividing the number of lines in the file by for completely accurate? 
+                #!  e.g. Could the file have comment lines? 
+                count = int(subprocess.check_output("zcat %s | wc -l " %\
+                            (self.args.paired_end[2*i]), shell=True).split(' ')[0])/4 
+                self.tot_pe[self.prefix_pe['sample-'+str(i)]]=count
+                self.prt_progress(\
+                    self.prefix_pe['sample-'+str(i)], 'raw data', 'FastQC-check', 'raw reads', str(count), '100.00 %')
+        V_tot_pe()
+
         v = 1 or int(self.args.verbose[0])
         #self.built_pipeline.run(target_tasks = self.target_tasks, logger = self.logger, verbose = v)
         self.built_pipeline.run(logger = self.logger, verbose = v)

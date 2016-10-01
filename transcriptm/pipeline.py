@@ -4,7 +4,8 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # 51: Removed all `exit(1)` after raise `Exception`."
 # 52: Modified self.pe#normalized_cov_col = [list([]) for _ in xrange(int(len(self.args.paired_end)/2)+3)] to use self.prefix_pe"
-print "55: Implemented JSON for abeyance file storage."
+# 55: Implemented JSON for abeyance file storage."
+print "56: ."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -900,7 +901,10 @@ class full_tm_pipeline:
                 logger.debug("concatenate_logtables: cmdline\n"+cmd)                
             extern.run(cmd)  
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # abeyance class
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         class abeyance(object):
+            """ for disk storage and retrieval of output files from tasks in Ruffus pipeline. """
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             @staticmethod
             def store(input_filenames, output_filename, logger, logging_mutex):
@@ -919,7 +923,7 @@ class full_tm_pipeline:
                     logger.info("Retrieved abeyance output filenames from " + input_file)
                 return output_filenames
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            """ wrappers to provide distinct terminal names, as required by ruffus pipeline tasks:"""
+            """ wrappers to provide unqualified names that are unique, as required by ruffus pipeline tasks. """
             # abeyance storage:
             @staticmethod
             def store_symlink_metaT(p1,p2,p3,p4):
@@ -937,10 +941,19 @@ class full_tm_pipeline:
             def store_map2ref(p1,p2,p3,p4):
                 abeyance.store(p1,p2,p3,p4) # See for meaningful description.
             @staticmethod
+            def store_mapping_filter(p1,p2,p3,p4):
+                abeyance.store(p1,p2,p3,p4) # See for meaningful description.
+            @staticmethod
             def store_bam2normalized_cov(p1,p2,p3,p4):
                 abeyance.store(p1,p2,p3,p4) # See for meaningful description.
             @staticmethod
+            def store_bam2raw_count(p1,p2,p3,p4):
+                abeyance.store(p1,p2,p3,p4) # See for meaningful description.
+            @staticmethod
             def store_transcriptM_table(p1,p2,p3,p4):
+                abeyance.store(p1,p2,p3,p4) # See for meaningful description.
+            @staticmethod
+            def store_raw_count_table(p1,p2,p3,p4):
                 abeyance.store(p1,p2,p3,p4) # See for meaningful description.
             # abeyance retrieval:
             @staticmethod
@@ -949,8 +962,28 @@ class full_tm_pipeline:
             @staticmethod
             def retrieve_trimmomatic(p1,p2,p3):
                 return abeyance.retrieve(p1,p2,p3) # See for meaningful description.
+            @staticmethod
+            def retrieve_phiX_extract(p1,p2,p3):
+                return abeyance.retrieve(p1,p2,p3) # See for meaningful description.
+            @staticmethod
+            def retrieve_sortmerna(p1,p2,p3):
+                return abeyance.retrieve(p1,p2,p3) # See for meaningful description.
+            @staticmethod
+            def retrieve_map2ref(p1,p2,p3):
+                return abeyance.retrieve(p1,p2,p3) # See for meaningful description.
+            @staticmethod
+            def retrieve_mapping_filter(p1,p2,p3):
+                return abeyance.retrieve(p1,p2,p3) # See for meaningful description.
+            @staticmethod
+            def retrieve_bam2normalized_cov(p1,p2,p3):
+                return abeyance.retrieve(p1,p2,p3) # See for meaningful description.
+            @staticmethod
+            def retrieve_transcriptM_table(p1,p2,p3):
+                return abeyance.retrieve(p1,p2,p3) # See for meaningful description.
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        restart_at = 2
+        # Restarting and halting of stages.
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        restart_at = None
         halt_after = None
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def require_run_stage(stage_ID):
@@ -994,6 +1027,7 @@ class full_tm_pipeline:
             decide_symlink_metaT = symlink_metaT
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if require_run_stage(2):
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.collate(task_func = trimmomatic, # Stage 2a
                 input = decide_symlink_metaT,
                 filter = ruffus.regex("R[12].fq.gz$"),
@@ -1020,242 +1054,293 @@ class full_tm_pipeline:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 3
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.subdivide(task_func = phiX_map, # Stage 3a
-            input = trimmomatic,
-            filter = ruffus.formatter(r"(.+)/(?P<BASE>.*)P1.fq.gz"),
-            output = [
-                "{path[0]}/phiX.{BASE[0]}P1.bam",
-                "{path[0]}/phiX.{BASE[0]}U1.bam",
-                "{path[0]}/phiX.{BASE[0]}U2.bam"], 
-            extras = [self.logger, self.logging_mutex]
-            )\
-        .follows(abeyance.store_trimmomatic)
+        if require_stage_restart(3):
+            decide_trimmomatic = abeyance.retrieve_trimmomatic(
+                os.path.join(self.args.working_dir, 'abeyance_trimmomatic.output'), self.logger, self.logging_mutex)
+        else:
+            decide_trimmomatic = trimmomatic
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(task_func = phiX_ID, # Stage 3b
-            input = phiX_map,
-            filter = ruffus.suffix(".bam"),
-            output = ".txt",
-            extras = [self.logger, self.logging_mutex]
-            )
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.collate(task_func = phiX_concat_ID, # Stage 3c
-            input = phiX_ID, 
-            filter = ruffus.formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),
-            output = '{path[0]}/{BASE[0]}phiX_ID.log',
-            extras = [
-                '{BASE[0]}',
-                self.logger, self.logging_mutex]
-            )
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.subdivide(task_func = QC_output, # Stage 3d
-            input = trimmomatic,
-            filter = ruffus.regex(r"trimm_[UP][12].fq.gz"),
-            output = ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"]
-            )
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(task_func = phiX_extract, # Stage 3e
-            input = QC_output,
-            filter = ruffus.suffix(".fq.gz"), 
-            add_inputs = ruffus.add_inputs(phiX_concat_ID), 
-            output = "_phiX_ext.fq", 
-            extras = [self.logger, self.logging_mutex]
-            )
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.merge(task_func = abeyance.store_phiX_extract, 
-            input = phiX_extract, 
-            output = os.path.join(self.args.working_dir, 'abeyance_phiX_extract.output'),
-            extras = [self.logger, self.logging_mutex]
-            )
+        if require_run_stage(3):
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.subdivide(task_func = phiX_map, # Stage 3a
+                input = decide_trimmomatic,
+                filter = ruffus.formatter(r"(.+)/(?P<BASE>.*)P1.fq.gz"),
+                output = [
+                    "{path[0]}/phiX.{BASE[0]}P1.bam",
+                    "{path[0]}/phiX.{BASE[0]}U1.bam",
+                    "{path[0]}/phiX.{BASE[0]}U2.bam"], 
+                extras = [self.logger, self.logging_mutex]
+                )\
+            .follows(abeyance.store_trimmomatic)
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.transform(task_func = phiX_ID, # Stage 3b
+                input = phiX_map,
+                filter = ruffus.suffix(".bam"),
+                output = ".txt",
+                extras = [self.logger, self.logging_mutex]
+                )
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.collate(task_func = phiX_concat_ID, # Stage 3c
+                input = phiX_ID, 
+                filter = ruffus.formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),
+                output = '{path[0]}/{BASE[0]}phiX_ID.log',
+                extras = [
+                    '{BASE[0]}',
+                    self.logger, self.logging_mutex]
+                )
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.subdivide(task_func = QC_output, # Stage 3d
+                input = trimmomatic,
+                filter = ruffus.regex(r"trimm_[UP][12].fq.gz"),
+                output = ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"]
+                )
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.transform(task_func = phiX_extract, # Stage 3e
+                input = QC_output,
+                filter = ruffus.suffix(".fq.gz"), 
+                add_inputs = ruffus.add_inputs(phiX_concat_ID), 
+                output = "_phiX_ext.fq", 
+                extras = [self.logger, self.logging_mutex]
+                )
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.merge(task_func = abeyance.store_phiX_extract, 
+                input = phiX_extract, 
+                output = os.path.join(self.args.working_dir, 'abeyance_phiX_extract.output'),
+                extras = [self.logger, self.logging_mutex]
+                )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 4
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.subdivide(task_func = sortmerna, # Stage 4
-            input = phiX_extract,
-            filter = ruffus.formatter(), 
-            output = "{path[0]}/{basename[0]}_non_ncRNA.fq",
-            extras = [
-                "{path[0]}/{basename[0]}_ncRNA.fq",
-                self.logger, self.logging_mutex]
-            )\
-        .follows(abeyance.store_phiX_extract)
+        if require_stage_restart(4):
+            decide_phiX_extract = abeyance.retrieve_phiX_extract(
+                os.path.join(self.args.working_dir, 'abeyance_phiX_extract.output'), self.logger, self.logging_mutex)
+        else:
+            decide_phiX_extract = phiX_extract
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.merge(task_func = abeyance.store_sortmerna, 
-            input = sortmerna, 
-            output = os.path.join(self.args.working_dir, 'abeyance4_sortmerna.output'),
-            extras = [self.logger, self.logging_mutex]
-            )
+        if require_run_stage(4):
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.subdivide(task_func = sortmerna, # Stage 4
+                input = decide_phiX_extract,
+                filter = ruffus.formatter(), 
+                output = "{path[0]}/{basename[0]}_non_ncRNA.fq",
+                extras = [
+                    "{path[0]}/{basename[0]}_ncRNA.fq",
+                    self.logger, self.logging_mutex]
+                )\
+            .follows(abeyance.store_phiX_extract)
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.merge(task_func = abeyance.store_sortmerna, 
+                input = sortmerna, 
+                output = os.path.join(self.args.working_dir, 'abeyance4_sortmerna.output'),
+                extras = [self.logger, self.logging_mutex]
+                )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 5
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        def function_abeyance4_sortmerna():
-            return [
-            "/srv/home/s4293029/tm_working/sample-0_trimm_P1_phiX_ext_non_ncRNA.fq",
-            "/srv/home/s4293029/tm_working/sample-0_trimm_P2_phiX_ext_non_ncRNA.fq",
-            "/srv/home/s4293029/tm_working/sample-0_trimm_U1_phiX_ext_non_ncRNA.fq",
-            "/srv/home/s4293029/tm_working/sample-0_trimm_U2_phiX_ext_non_ncRNA.fq"]
+        if require_stage_restart(5):
+            decide_sortmerna = abeyance.retrieve_sortmerna(
+                os.path.join(self.args.working_dir, 'abeyance_sortmerna.output'), self.logger, self.logging_mutex)
+        else:
+            decide_sortmerna = sortmerna
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.collate(task_func = concat_for_mapping, # Stage 5a
-            input = sortmerna,
-#            input = function_abeyance4_sortmerna(),
-#            input = [
-#                "/srv/home/s4293029/tm_working/sample-0_trimm_P1_phiX_ext_non_ncRNA.fq",
-#                "/srv/home/s4293029/tm_working/sample-0_trimm_P2_phiX_ext_non_ncRNA.fq",
-#                "/srv/home/s4293029/tm_working/sample-0_trimm_U1_phiX_ext_non_ncRNA.fq",
-#                "/srv/home/s4293029/tm_working/sample-0_trimm_U2_phiX_ext_non_ncRNA.fq"],
-            filter = ruffus.regex(r"trimm_.*"),
-            output = ["concat_paired_R1.fq", "concat_paired_R2.fq", "concat_single.fq"],
-            extras = [
-                "ID_single.txt", 
-                self.logger, self.logging_mutex]
-            )\
-        .follows(abeyance.store_sortmerna)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(task_func = save_processed_reads, # Stage 5aR
-            input = concat_for_mapping, 
-            filter = ruffus.formatter(),
-            output = [
-                os.path.join(self.SUBDIR_processed_reads, "{basename[0]}{ext[0]}"),
-                os.path.join(self.SUBDIR_processed_reads, "{basename[1]}{ext[1]}"),
-                os.path.join(self.SUBDIR_processed_reads, "{basename[2]}{ext[2]}")],
-            extras = [self.logger, self.logging_mutex]
-            )\
-        .mkdir(self.SUBDIR_processed_reads)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(task_func = symlink_metaG, # Stage 1b
-            input = self.args.metaG_contigs, # filename of all contigs from the reference metagenome (in a fasta file).
-            filter = ruffus.formatter(), 
-            output = os.path.join(self.args.working_dir, "{basename[0]}"+".fa"), # put in working directory.
-            extras = [self.logger, self.logging_mutex]
-            )\
-        .mkdir(self.args.working_dir)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(task_func = symlink_metaG_index, # Stage 1c
-            input = [self.args.metaG_contigs+x for x in ['.amb','.bwt','.ann','.pac','.sa']], 
-            filter = ruffus.formatter(),
-            output = os.path.join(self.args.working_dir,"{basename[0]}{ext[0]}"), # put in working directory.
-            extras = [self.logger, self.logging_mutex]
-            )\
-        .mkdir(self.args.working_dir)\
-        .active_if(self.has_index(self.args.metaG_contigs, ['.amb','.bwt','.ann','.pac','.sa']))
-            # Intended to be used when bwa indexes are present.
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(task_func = map2ref, # Stage 5b
-            input = concat_for_mapping, 
-            filter = ruffus.formatter(r"(.+)/(?P<BASE>.*)_concat_paired_R1.fq"), 
-            add_inputs = ruffus.add_inputs(symlink_metaG),
-            output = "{path[0]}/{BASE[0]}.bam",
-            extras = [
-                ["{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[0]}.bam",
-                 "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[2]}.bam",
-                 "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+"{BASE[0]}_merged.bam"],
-                "{path[0]}/{BASE[0]}_mapping.log",
-                self.logger, self.logging_mutex]
-            )\
-        .follows(symlink_metaG_index) # This dependency has been added since v0.3.
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.merge(task_func = abeyance.store_map2ref, 
-            input = map2ref, 
-            output = os.path.join(self.args.working_dir, 'abeyance_map2ref.output'),
-            extras = [self.logger, self.logging_mutex]
-            )
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(task_func = mapping_filter, # Stage 5c
-            input = map2ref,
-            filter = ruffus.formatter('.bam'),
-            output = "{path[0]}/{basename[0]}_filtered.bam", 
-            extras = [
-                "{path[0]}/{basename[0]}_stringency_filter.log", 
-                self.logger, self.logging_mutex]
-            )
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        """ flag `args.no_mapping_filter`:
-            (a) determines whether mapping_filter() is performed (to transform the results of map2ref()).
-                At the moment, mapping_filter() is still entered into, but the flag is checked again inside 
-                the function so that nothing is performed.
-            (b) determines whether the inputs for bam2raw_count() and bam2normalized_cov() are taken directly 
-                from map2ref() or whether they are taken from the subsequent mapping_filter().
-        """
-        if self.args.no_mapping_filter:  
-            bam_file = map2ref 
-        else: 
-            bam_file = mapping_filter
+        if require_run_stage(5):
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.collate(task_func = concat_for_mapping, # Stage 5a
+                input = decide_sortmerna,
+                filter = ruffus.regex(r"trimm_.*"),
+                output = ["concat_paired_R1.fq", "concat_paired_R2.fq", "concat_single.fq"],
+                extras = [
+                    "ID_single.txt", 
+                    self.logger, self.logging_mutex]
+                )\
+            .follows(abeyance.store_sortmerna)
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.transform(task_func = save_processed_reads, # Stage 5aR
+                input = concat_for_mapping, 
+                filter = ruffus.formatter(),
+                output = [
+                    os.path.join(self.SUBDIR_processed_reads, "{basename[0]}{ext[0]}"),
+                    os.path.join(self.SUBDIR_processed_reads, "{basename[1]}{ext[1]}"),
+                    os.path.join(self.SUBDIR_processed_reads, "{basename[2]}{ext[2]}")],
+                extras = [self.logger, self.logging_mutex]
+                )\
+            .mkdir(self.SUBDIR_processed_reads)
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.transform(task_func = symlink_metaG, # Stage 1b
+                input = self.args.metaG_contigs, # filename of all contigs from the reference metagenome (in a fasta file).
+                filter = ruffus.formatter(), 
+                output = os.path.join(self.args.working_dir, "{basename[0]}"+".fa"), # put in working directory.
+                extras = [self.logger, self.logging_mutex]
+                )\
+            .mkdir(self.args.working_dir)
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.transform(task_func = symlink_metaG_index, # Stage 1c
+                input = [self.args.metaG_contigs+x for x in ['.amb','.bwt','.ann','.pac','.sa']], 
+                filter = ruffus.formatter(),
+                output = os.path.join(self.args.working_dir,"{basename[0]}{ext[0]}"), # put in working directory.
+                extras = [self.logger, self.logging_mutex]
+                )\
+            .mkdir(self.args.working_dir)\
+            .active_if(self.has_index(self.args.metaG_contigs, ['.amb','.bwt','.ann','.pac','.sa']))
+                # Intended to be used when bwa indexes are present.
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.transform(task_func = map2ref, # Stage 5b
+                input = concat_for_mapping, 
+                filter = ruffus.formatter(r"(.+)/(?P<BASE>.*)_concat_paired_R1.fq"), 
+                add_inputs = ruffus.add_inputs(symlink_metaG),
+                output = "{path[0]}/{BASE[0]}.bam",
+                extras = [
+                    ["{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[0]}.bam",
+                     "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[2]}.bam",
+                     "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+"{BASE[0]}_merged.bam"],
+                    "{path[0]}/{BASE[0]}_mapping.log",
+                    self.logger, self.logging_mutex]
+                )\
+            .follows(symlink_metaG_index) # This dependency has been added since v0.3.
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.merge(task_func = abeyance.store_map2ref, 
+                input = map2ref, 
+                output = os.path.join(self.args.working_dir, 'abeyance_map2ref.output'),
+                extras = [self.logger, self.logging_mutex]
+                )
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.transform(task_func = mapping_filter, # Stage 5c
+                input = map2ref,
+                filter = ruffus.formatter('.bam'),
+                output = "{path[0]}/{basename[0]}_filtered.bam", 
+                extras = [
+                    "{path[0]}/{basename[0]}_stringency_filter.log", 
+                    self.logger, self.logging_mutex]
+                )
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.merge(task_func = abeyance.store_mapping_filter, 
+                input = mapping_filter, 
+                output = os.path.join(self.args.working_dir, 'abeyance_mapping_filter.output'),
+                extras = [self.logger, self.logging_mutex]
+                )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 6
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.subdivide(task_func = bam2normalized_cov, # Stage 6a
-            input = bam_file, 
-            filter = ruffus.formatter(),
-            output = '{path[0]}/*normalized_cov.csv',
-            extras = [
-                '{path[0]}/coverage.csv',
-                self.args.dir_bins,
-                self.logger, self.logging_mutex]
-            )\
-        .follows(abeyance.store_map2ref)
+        if require_stage_restart(6):
+            if self.args.no_mapping_filter:  
+                decide_bam_file = abeyance.retrieve_map2ref(
+                    os.path.join(self.args.working_dir, 'abeyance_map2ref.output'), 
+                    self.logger, self.logging_mutex)
+            else: 
+                decide_bam_file = abeyance.retrieve_mapping_filter(
+                    os.path.join(self.args.working_dir, 'abeyance_mapping_filter.output'), 
+                    self.logger, self.logging_mutex)
+        else:
+            if self.args.no_mapping_filter:  
+                decide_bam_file = map2ref 
+            else: 
+                decide_bam_file = mapping_filter
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.merge(task_func = abeyance.store_bam2normalized_cov, 
-            input = bam2normalized_cov, 
-            output = os.path.join(self.args.working_dir, 'abeyance_bam2normalized_cov.output'),
-            extras = [self.logger, self.logging_mutex]
-            )
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.subdivide(task_func = bam2raw_count, # Stage 6b
-            input = bam_file,
-            filter = ruffus.formatter(),
-            output = '{path[0]}/*count.csv',
-            extras = [
-                self.list_gff,
-                self.logger, self.logging_mutex]
-            )
+        if require_run_stage(6):
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            """ NB. flag `args.no_mapping_filter`:
+                (a) determines whether mapping_filter() is performed (to transform the results of map2ref()).
+                    At the moment, mapping_filter() is still entered into, but the flag is checked again inside 
+                    the function so that nothing is performed.
+                (b) determines whether the inputs for bam2raw_count() and bam2normalized_cov() are taken directly 
+                    from map2ref() or whether they are taken from the subsequent mapping_filter().
+            """
+#            if self.args.no_mapping_filter:  
+#                bam_file = map2ref 
+#            else: 
+#                bam_file = mapping_filter
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.subdivide(task_func = bam2normalized_cov, # Stage 6a
+                input = decide_bam_file, 
+                filter = ruffus.formatter(),
+                output = '{path[0]}/*normalized_cov.csv',
+                extras = [
+                    '{path[0]}/coverage.csv',
+                    self.args.dir_bins,
+                    self.logger, self.logging_mutex]
+                )\
+            .follows(abeyance.store_map2ref)
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.merge(task_func = abeyance.store_bam2normalized_cov, 
+                input = bam2normalized_cov, 
+                output = os.path.join(self.args.working_dir, 'abeyance_bam2normalized_cov.output'),
+                extras = [self.logger, self.logging_mutex]
+                )
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.subdivide(task_func = bam2raw_count, # Stage 6b
+                input = decide_bam_file,
+                filter = ruffus.formatter(),
+                output = '{path[0]}/*count.csv',
+                extras = [
+                    self.list_gff,
+                    self.logger, self.logging_mutex]
+                )
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.merge(task_func = abeyance.store_bam2raw_count, 
+                input = bam2raw_count, 
+                output = os.path.join(self.args.working_dir, 'abeyance_bam2raw_count.output'),
+                extras = [self.logger, self.logging_mutex]
+                )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 7
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.merge(task_func = transcriptM_table, # Stage 7a # Concatenate all the normalized_cov results in a table
-            input = bam2normalized_cov, 
-            output = os.path.join(self.args.output_dir, os.path.basename(self.args.output_dir)+'_NORM_COVERAGE.csv'),
-            extras = [self.logger, self.logging_mutex]
-            )\
-        .mkdir(self.args.output_dir)
+        if require_run_stage(7):
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.merge(task_func = transcriptM_table, # Stage 7a # Concatenate all the normalized_cov results in a table
+                input = bam2normalized_cov, 
+                output = os.path.join(self.args.output_dir, 
+                                      os.path.basename(self.args.output_dir)+'_NORM_COVERAGE.csv'),
+                extras = [self.logger, self.logging_mutex]
+                )\
+            .mkdir(self.args.output_dir)
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.merge(task_func = abeyance.store_transcriptM_table, 
+                input = transcriptM_table, 
+                output = os.path.join(self.args.working_dir, 'abeyance_transcriptM_table.output'),
+                extras = [self.logger, self.logging_mutex]
+                )
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.merge(task_func = raw_count_table, # Stage 7b # Concatenate all the raw count in a table
+                input = bam2raw_count,
+                output = os.path.join(self.args.output_dir, os.path.basename(self.args.output_dir)+'_COUNT.csv'),
+                extras = [self.logger, self.logging_mutex]
+                )\
+            .mkdir(self.args.output_dir)
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.merge(task_func = abeyance.store_raw_count_table, 
+                input = raw_count_table, 
+                output = os.path.join(self.args.working_dir, 'abeyance_raw_count_table.output'),
+                extras = [self.logger, self.logging_mutex]
+                )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.merge(task_func = abeyance.store_transcriptM_table, 
-            input = transcriptM_table, 
-            output = os.path.join(self.args.working_dir, 'abeyance_transcriptM_table.output'),
-            extras = [self.logger, self.logging_mutex]
-            )
+        # Stage 8 (formerly 6?) Reporting?
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.merge(task_func = raw_count_table, # Stage 7b # Concatenate all the raw count in a table
-            input = bam2raw_count,
-            output = os.path.join(self.args.output_dir, os.path.basename(self.args.output_dir)+'_COUNT.csv'),
-            extras = [self.logger, self.logging_mutex]
-            )\
-        .mkdir(self.args.output_dir)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # Stage 6 Reporting?
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.collate(task_func = logtable, # Stage 6R2  
-            input = save_log, 
-            filter = 
-                ruffus.formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|" + \
-                "(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
-            output = self.SUBDIR_reads_distribution + "/{BASE[0]}_reads_stat",
-            extras = ['{BASE[0]}']
-            )\
-        .mkdir(self.SUBDIR_reads_distribution)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.transform(task_func = save_log, # Stage 6R1
-            input = self.args.working_dir+'/*.log', 
-            filter = ruffus.formatter(".log"),  
-            output = os.path.join(self.SUBDIR_log, "{basename[0]}"+".log"),
-            extras = [self.logger, self.logging_mutex]
-            )\
-        .mkdir(self.SUBDIR_log)\
-        .follows(bam2normalized_cov)
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl.merge(task_func = concatenate_logtables, # Stage 6R3
-            input = logtable, 
-            output = os.path.join(self.args.output_dir, 'summary_reads'), 
-            extras = [self.logger, self.logging_mutex]
-            )
+        if require_run_stage(8):
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.transform(task_func = save_log, # Stage 6R1
+                input = self.args.working_dir+'/*.log', 
+                filter = ruffus.formatter(".log"),  
+                output = os.path.join(self.SUBDIR_log, "{basename[0]}"+".log"),
+                extras = [self.logger, self.logging_mutex]
+                )\
+            .mkdir(self.SUBDIR_log)\
+            .follows(bam2normalized_cov)
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.collate(task_func = logtable, # Stage 6R2  
+                input = save_log, 
+                filter = 
+                    ruffus.formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|" + \
+                    "(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
+                output = self.SUBDIR_reads_distribution + "/{BASE[0]}_reads_stat",
+                extras = ['{BASE[0]}']
+                )\
+            .mkdir(self.SUBDIR_reads_distribution)
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.merge(task_func = concatenate_logtables, # Stage 6R3
+                input = logtable, 
+                output = os.path.join(self.args.output_dir, 'summary_reads'), 
+                extras = [self.logger, self.logging_mutex]
+                )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: RUN
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

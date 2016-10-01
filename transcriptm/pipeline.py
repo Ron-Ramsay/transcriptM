@@ -5,7 +5,8 @@
 # 51: Removed all `exit(1)` after raise `Exception`."
 # 52: Modified self.pe#normalized_cov_col = [list([]) for _ in xrange(int(len(self.args.paired_end)/2)+3)] to use self.prefix_pe"
 # 55: Implemented JSON for abeyance file storage."
-print "56: ."
+# 56: Added abeyance storage and retrieval to all stages." 
+print "57: Separated pipeline build and pipeline run."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
@@ -342,14 +343,14 @@ class full_tm_pipeline:
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Pipeline Stages
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    def pipeline_stages(self):
-        """ defines all the pipelined functions and runs them. """
+    def build_pipeline_stages(self):
+        """ build the pipeline by adding ruffus tasks. """
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 1
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def symlink_metaT(soft_link_name, logger, logging_mutex): # Stage 1a
             """ Make soft link in working directory. """
-            print "************** symlink_metaT locals():", locals()
+#            print "************** symlink_metaT locals():", locals()
             input_file = self.alias_pe[soft_link_name]
             with logging_mutex:
                 logger.info("Linking files %(input_file)s -> %(soft_link_name)s"%locals())
@@ -383,7 +384,7 @@ class full_tm_pipeline:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def trimmomatic(input_files, output_file, log, logger, logging_mutex): # Stage 2a
             """ Trimmomatic. Trim and remove adapters of paired reads. """
-            print "************** trimmomatic locals():", locals()
+#            print "************** trimmomatic locals():", locals()
             if len(input_files) != 2:
                 raise Exception("One of read pairs %s missing" % (input_files,))  
             cmd = "trimmomatic PE "
@@ -1342,6 +1343,10 @@ class full_tm_pipeline:
                 extras = [self.logger, self.logging_mutex]
                 )
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Assign the ruffus pipeline to the object.
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        self.built_pipeline = rpl
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: RUN
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         #for task in ruffus.pipeline_get_task_names():
@@ -1367,10 +1372,18 @@ class full_tm_pipeline:
 #        v = int(self.args.verbose[0])
 #        print "v:", v, type(v)
 #
+#        v = 1 or int(self.args.verbose[0])
+        #rpl.run(target_tasks = self.target_tasks, logger = self.logger, verbose = v) # verbose = 0 defaults to 1
+#        rpl.run(target_tasks = self.target_tasks, logger = self.logger, verbose = v) # verbose = 0 defaults to 1
+        #rpl.run(target_tasks = self.target_tasks, logger = self.logger, verbose = v) # verbose = 0 defaults to 1
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Post-pipeline activity
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    def run_built_pipeline(self):
+        assert self.built_pipeline != None, "The pipeline needs to be built before it can be run."
         v = 1 or int(self.args.verbose[0])
-        #rpl.run(target_tasks = self.target_tasks, logger = self.logger, verbose = v) # verbose = 0 defaults to 1
-        rpl.run(target_tasks = self.target_tasks, logger = self.logger, verbose = v) # verbose = 0 defaults to 1
-        #rpl.run(target_tasks = self.target_tasks, logger = self.logger, verbose = v) # verbose = 0 defaults to 1
+        self.built_pipeline.run(target_tasks = self.target_tasks, logger = self.logger, verbose = v)
+        pass
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Post-pipeline activity
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

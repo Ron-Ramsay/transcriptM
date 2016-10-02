@@ -384,6 +384,27 @@ class pipeline_object:
     def build_pipeline_stages(self):
         """ build the pipeline by adding ruffus tasks. """
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Stage 0
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        def V_tot_pe():
+            """ populates dictionary `self.tot_pe`:
+                index: descriptor of the longest common substring (trimmed of some types of trailing characters) 
+                    for the pair of filenames;
+                    i.e. corresponds to the values of  dictionary `self.prefix_pe`.
+                value: the count of reads.
+                e.g. {'20120800_P2M': 815272, ...}
+                Dependencies: self.args.paired_end, self.prefix_pe.
+            """
+            self.tot_pe = {}
+            for i in range(int(len(self.args.paired_end)/2)):
+                #! ACCURACY?: Is dividing the number of lines in the file by for completely accurate? 
+                #!  e.g. Could the file have comment lines? 
+                count = int(subprocess.check_output("zcat %s | wc -l " %\
+                            (self.args.paired_end[2*i]), shell=True).split(' ')[0])/4 
+                self.tot_pe[self.prefix_pe['sample-'+str(i)]]=count
+                self.prt_progress(\
+                    self.prefix_pe['sample-'+str(i)], 'raw data', 'FastQC-check', 'raw reads', str(count), '100.00 %')
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 1
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def symlink_metaT(soft_link_name, logger, logging_mutex): # Stage 1a
@@ -943,6 +964,13 @@ class pipeline_object:
             """ for disk storage and retrieval of output files from tasks in Ruffus pipeline. """
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             @staticmethod
+            def passthrough(input_files, output_files, stage, logger, logging_mutex):
+                """ used as a task which the ruffus pipeline must pass thing through in a coordinated way. """
+                print "\n*** passthrough locals:", locals()
+                with logging_mutex:     
+                    logger.info("Passing through stage end point for " + stage)
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            @staticmethod
             def store(input_filenames, output_filename, logger, logging_mutex):
                 """ saves filenames (various structures of strings) to disk in JSON format; does a log entry. """
                 with open(output_filename, 'w') as outfile:
@@ -960,6 +988,54 @@ class pipeline_object:
                 return output_filenames
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             """ wrappers to provide unqualified names that are unique, as required by ruffus pipeline tasks. """
+            # pass-through checkpoint stages:
+
+#            @staticmethod
+#            def end_symlink_metaT(p1,p2,p3,p4,p5):
+#                abeyance.passthrough(p1,p2,p3,p4,p5) # See for meaningful description.
+#            @staticmethod
+#            def end_trimmomatic(p1,p2,p3,p4,p5):
+#                abeyance.passthrough(p1,p2,p3,p4,p5) # See for meaningful description.
+
+            @staticmethod
+            def end_symlink_metaT(input_files, output_files, stage, logger, logging_mutex):
+                """ used as a task which the ruffus pipeline must pass thing through in a coordinated way. """
+                print "\n*** passthrough locals:", locals()
+                with logging_mutex:     
+                    logger.info("Passing through stage end point for >" + stage)            
+            @staticmethod
+            def end_trimmomatic(input_files, output_files, stage, logger, logging_mutex):
+                """ used as a task which the ruffus pipeline must pass thing through in a coordinated way. """
+                print "\n*** passthrough locals:", locals()
+                with logging_mutex:     
+                    logger.info("Passing through stage end point for " + stage)            
+            @staticmethod
+            def end_phiX_extract(p1,p2,p3,p4,p5):
+                abeyance.passthrough(p1,p2,p3,p4,p5) # See for meaningful description.
+            @staticmethod
+            def end_sortmerna(p1,p2,p3,p4,p5):
+                abeyance.passthrough(p1,p2,p3,p4,p5) # See for meaningful description.
+            @staticmethod
+            def end_concat_for_mapping(p1,p2,p3,p4,p5):
+                abeyance.passthrough(p1,p2,p3,p4,p5) # See for meaningful description.
+            @staticmethod
+            def end_map2ref(p1,p2,p3,p4,p5):
+                abeyance.passthrough(p1,p2,p3,p4,p5) # See for meaningful description.
+            @staticmethod
+            def end_mapping_filter(p1,p2,p3,p4,p5):
+                abeyance.passthrough(p1,p2,p3,p4,p5) # See for meaningful description.
+            @staticmethod
+            def end_bam2normalized_cov(p1,p2,p3,p4,p5):
+                abeyance.passthrough(p1,p2,p3,p4,p5) # See for meaningful description.
+            @staticmethod
+            def end_bam2raw_count(p1,p2,p3,p4,p5):
+                abeyance.passthrough(p1,p2,p3,p4,p5) # See for meaningful description.
+            @staticmethod
+            def end_transcriptM_table(p1,p2,p3,p4,p5):
+                abeyance.passthrough(p1,p2,p3,p4,p5) # See for meaningful description.
+            @staticmethod
+            def end_raw_count_table(p1,p2,p3,p4,p5):
+                abeyance.passthrough(p1,p2,p3,p4,p5) # See for meaningful description.
             # abeyance storage:
             @staticmethod
             def store_symlink_metaT(p1,p2,p3,p4):
@@ -1055,6 +1131,7 @@ class pipeline_object:
                 output = self.alias_pe.keys(), # soft-link filenames of metatranscriptomic paired-end reads.
                 extras = [self.logger, self.logging_mutex]
                 )\
+            .follows(V_tot_pe)\
             .mkdir(self.args.working_dir)
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.merge(task_func = abeyance.store_symlink_metaT, 
@@ -1089,6 +1166,7 @@ class pipeline_object:
                     "trimmomatic.log",
                     self.logger, self.logging_mutex]
                 )\
+            .follows(V_tot_pe)\
             .mkdir(self.args.working_dir)
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.merge(task_func = abeyance.store_trimmomatic,
@@ -1139,7 +1217,8 @@ class pipeline_object:
                 extras = [
                     '{BASE[0]}',
                     self.logger, self.logging_mutex]
-                )
+                )\
+            .follows(V_tot_pe)\
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.subdivide(task_func = QC_output, # Stage 3d
                 input = decide_trimmomatic,
@@ -1203,7 +1282,8 @@ class pipeline_object:
                 extras = [
                     "ID_single.txt", 
                     self.logger, self.logging_mutex]
-                )
+                )\
+            .follows(V_tot_pe)\
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.merge(task_func = abeyance.store_concat_for_mapping, 
                 input = concat_for_mapping, 
@@ -1263,7 +1343,8 @@ class pipeline_object:
                 "{path[0]}/{BASE[0]}_mapping.log",
                 self.logger, self.logging_mutex]
                 )\
-            .follows(symlink_metaG_index) # This dependency has been added since v0.3.
+            .follows(symlink_metaG_index)\
+            .follows(V_tot_pe)
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.merge(task_func = abeyance.store_map2ref, 
                 input = map2ref, 
@@ -1278,7 +1359,8 @@ class pipeline_object:
                 extras = [
                     "{path[0]}/{basename[0]}_stringency_filter.log", 
                     self.logger, self.logging_mutex]
-                )
+                )\
+            .follows(V_tot_pe)
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.merge(task_func = abeyance.store_mapping_filter, 
                 input = mapping_filter, 
@@ -1288,6 +1370,13 @@ class pipeline_object:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 6
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        """ NB. flag `args.no_mapping_filter`:
+            (a) determines whether mapping_filter() is performed (to transform the results of map2ref()).
+                At the moment, mapping_filter() is still entered into, but the flag is checked again inside 
+                the function so that nothing is performed.
+            (b) determines whether the inputs for bam2raw_count() and bam2normalized_cov() are taken directly 
+                from map2ref() or whether they are taken from the subsequent mapping_filter().
+        """
         if require_stage_restart(6):
             if self.args.no_mapping_filter:  
                 decide_bam_file = abeyance.retrieve_map2ref(
@@ -1304,18 +1393,6 @@ class pipeline_object:
                 decide_bam_file = mapping_filter
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if require_run_stage(6):
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            """ NB. flag `args.no_mapping_filter`:
-                (a) determines whether mapping_filter() is performed (to transform the results of map2ref()).
-                    At the moment, mapping_filter() is still entered into, but the flag is checked again inside 
-                    the function so that nothing is performed.
-                (b) determines whether the inputs for bam2raw_count() and bam2normalized_cov() are taken directly 
-                    from map2ref() or whether they are taken from the subsequent mapping_filter().
-            """
-#            if self.args.no_mapping_filter:  
-#                bam_file = map2ref 
-#            else: 
-#                bam_file = mapping_filter
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.subdivide(task_func = bam2normalized_cov, # Stage 6a
                 input = decide_bam_file, 
@@ -1363,11 +1440,12 @@ class pipeline_object:
                 input = save_log, 
                 filter = 
                     ruffus.formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|" + \
-                    "(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
+                        "(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
                 output = self.SUBDIR_reads_distribution + "/{BASE[0]}_reads_stat",
                 extras = ['{BASE[0]}']
                 )\
-            .mkdir(self.SUBDIR_reads_distribution)
+            .mkdir(self.SUBDIR_reads_distribution)\
+            .follows(V_tot_pe)
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.merge(task_func = concatenate_logtables, # Stage 6R3
                 input = logtable, 
@@ -1455,31 +1533,9 @@ class pipeline_object:
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def run_built_pipeline(self):
         assert self.built_pipeline != None, "The pipeline needs to be built before it can be run."
-
-
-        def V_tot_pe():
-            """ populates dictionary `self.tot_pe`:
-                index: descriptor of the longest common substring (trimmed of some types of trailing characters) 
-                    for the pair of filenames;
-                    i.e. corresponds to the values of  dictionary `self.prefix_pe`.
-                value: the count of reads.
-                e.g. {'20120800_P2M': 815272, ...}
-                Dependencies: self.args.paired_end, self.prefix_pe.
-            """
-            self.tot_pe = {}
-            for i in range(int(len(self.args.paired_end)/2)):
-                #! ACCURACY?: Is dividing the number of lines in the file by for completely accurate? 
-                #!  e.g. Could the file have comment lines? 
-                count = int(subprocess.check_output("zcat %s | wc -l " %\
-                            (self.args.paired_end[2*i]), shell=True).split(' ')[0])/4 
-                self.tot_pe[self.prefix_pe['sample-'+str(i)]]=count
-                self.prt_progress(\
-                    self.prefix_pe['sample-'+str(i)], 'raw data', 'FastQC-check', 'raw reads', str(count), '100.00 %')
-        V_tot_pe()
-
-        v = 1 or int(self.args.verbose[0])
+        #v = 1 or int(self.args.verbose[0])
         #self.built_pipeline.run(target_tasks = self.target_tasks, logger = self.logger, verbose = v)
-        self.built_pipeline.run(logger = self.logger, verbose = v)
+        self.built_pipeline.run(logger = self.logger)
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Post-pipeline activity
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

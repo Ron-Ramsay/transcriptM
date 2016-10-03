@@ -5,9 +5,7 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Developer's temporary playground
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# 57: Separated pipeline build and pipeline run."
-# 58: Implemented full halt_after_stage and restart_from_stage."
-print "62: renamed valid_processes class to const."
+# 62: renamed valid_processes class to const."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules 
@@ -110,11 +108,11 @@ def parser_built_with_ruffus():
 
     parser.add_argument("--halt_after_stage", dest="halt_after_stage",
             help=\
-            "An intermediate stage; after this stage is completed, the pipeline run will halt.\n"\
+            "An intermediate stage. After this stage is completed, the pipeline run will halt.\n"\
             "Available options are as follows. Use either the ID (without the bracket) OR the text-string:\n"\
             + tm_pipeline.const.valid_stages_str() +\
-            "IMPORTANT: The pipeline may later be restarted from the next stage, but note:\n "\
-            "(i) the same `--paired_end` arguments must be supplied "\
+            "Important: The pipeline may later be restarted from the next stage (or previous stages), but note:\n"\
+            " (i) the same `--paired_end` arguments must be supplied "\
             "in exactly the SAME ORDER as before,\n else mismatching will occur; and "\
             "(ii) the `--working_dir` argument must be specified explicitly,\n"\
             " and the data must be retained in the specified directory between runs.")
@@ -123,7 +121,7 @@ def parser_built_with_ruffus():
             help=\
             "An intermediate stage to restart from, using previously saved data in the `--working_dir` directory.\n"\
             "Available options are the same as per option `--halt_after_stage`.\n"\
-            "NB. See very important notes in the help for option `--halt_after_completing`.")
+            "NB. See important notes in the help for option `--halt_after_stage`.")
 
     # General option: TranscriptM database path:
     db_path=None    
@@ -138,7 +136,7 @@ def parser_built_with_ruffus():
         parser.add_argument("--db_path", dest="db_path", required=True, 
                 help="Directory which contains the TranscriptM databases")
 
-    parser.add_argument("--output_dir", dest="output_dir", default='TranscriptM_output', help="Output directory ")
+    parser.add_argument("--output_dir", dest="output_dir", default='TranscriptM_output', help="Output directory")
 
     # General option: working directory:
     parser.add_argument("--working_dir", dest="working_dir", 

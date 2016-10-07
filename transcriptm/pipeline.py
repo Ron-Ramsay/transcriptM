@@ -1,10 +1,6 @@
 #!/usr/bin/env python 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Developer's temporary playground
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# 61: (Temporarily) moved def V_tot_pe() to run after the pipeline is constructed and before it is run."
-# 62: renamed valid_processes class to const."
 
+""" Implements the pipeline object for TranscriptM: a rapid-throughput pipeline of meta-transcriptomes. """
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -26,148 +22,110 @@ import ruffus        # light-weight computational pipeline management. See http:
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Locally written modules
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-from monitoring import Monitoring  # implements class `Monitoring`. (Locally-written module).
+from monitoring import Monitoring  # implements class `Monitoring`.
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Constants exposed.
+# Exposed constants.
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 class const(object):
-    """ provides constants, such as valid stages and functions of the pipeline. """
+    """ exposes constants, such as valid stages of the pipeline. """
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    """ Stage number values reflect stage order in the pipeline order,  
+        and are expected to be positive integers or floats with <= 1 decimal place. """
+    _valid_stages_dict = {
+        "view_raw_reads":   1,
+        "trim_raw_reads":   2,
+        "phiX_removal":     3,
+        "filter_rna":       4,
+        "prep_for_mapping": 5.2,
+        "map_to_reference": 5.5,
+        "bam_stats":        6,
+        "summary_tables":   7}
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     @staticmethod
-    def _raw_str_to_dict(raw_data):
-        """ (helper): parses `raw_data`--i.e. lines in the format of "ID)name"--, to return a dictionary of 
-            names indexed by ID. 
-        """
-        Separator = ")" # constant.
-        # For easy pasting of data... format: identifier that must begin with a digit; ")"-separator; name:
-        # Transform the raw data into a dictionary and return that dictionary:
-        d = {} # Initialize the dictionary to return.
-        for line in raw_data.split("\n"):
-            # Extract the fields from the line:        
-            fields = line.split(Separator)
-            assert(len(fields) == 2) # Ensure no extra separators in the line.
-            # Name the fields:
-            ID = fields[0].strip()
-            name = fields[1].strip()
-            assert(len(ID.split()) == 1) # Ensure no embedded spaces in the field.
-            assert(len(name.split()) == 1) # Ensure no embedded spaces in the field.
-            # Add the fields to the dictionary:
-            d[ID] = name
-        return d
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    @staticmethod
-    def _dict_to_str_lines(D):
-        """ (helper): returns a single string of sorted dictionary entries, each line showing an ID and name. """
-        lines = "" # Intitialize return string. 
-        for line in sorted(D.items()):
-            lines += "\t" + "\t".join(line) + "\n"
-        return lines
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    @staticmethod
-    def valid_stages_dict():
-        """ conceptual pipeline stages (constructed for the purposes of segmenting the pipeline for restarts). 
-            Cf. valid_functions. 
-        """
-        # Nb. use only integers or floats for the ID.
-        raw_data = \
-            """ 1)   view_raw_reads
-                2)   trim_raw_reads
-                3)   phiX_removal
-                4)   filter_rna
-                5.2) prep_for_mapping
-                5.5) map_to_reference
-                6)   bam_stats
-                7)   summary_tables """
-        return const._raw_str_to_dict(raw_data)
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    @staticmethod
-    def valid_functions_dict():
-        """ Python funtion names in the Ruffus pipeline. (constructed for the purposes of 
-            fine control of the pipeline. Cf. valid_stages """
-        raw_data = \
-            """ 1a) symlink_metaT
-                1aR) view_raw_data
-                1b) symlink_metaG
-                1c) symlink_metaG_index
-                2a) trimmomatic
-                2St) store_trimmomatic
-                2aR) view_processed_data
-                3a) phiX_map
-                3b) phiX_ID
-                3c) phiX_concat_ID
-                3d) QC_output
-                3e) phiX_extract
-                3A) save3
-                4) sortmerna
-                5a) concat_for_mapping
-                5aR) save_processed_reads
-                5b) map2ref
-                5c) mapping_filter
-                6a) bam2normalized_cov
-                6b) bam2raw_count
-                6R1) save_log
-                6R2) logtable
-                6R3) concatenate_logtables
-                7a) transcriptM_table
-                7b) raw_count_table """    
-        return const._raw_str_to_dict(raw_data)
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    @staticmethod
-    def valid_stage_ID(stage):
-        """ given either a stage ID or stage name, returns the stage ID (as a string), or None if not valid. """
-        pass
-        if stage[0].isdigit():
-            if stage in const.valid_stages_dict().keys():
-                return stage
-            else:
-                return None
-        else:
-            for (ID, name) in const.valid_stages_dict().items():
-                if name == stage:
-                    return ID
-            return None
+    def is_valid_stage(stage_name):
+        """ boolean: whether the stage_name string represent a valid stage. """
+        return stage_name in const._valid_stages_dict        
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     @staticmethod
     def valid_stages_str():
-        """ returns a single string of sorted valid stages, each line showing a valid stage and name. """
-        return const._dict_to_str_lines(const.valid_stages_dict())
+        """ returns a single string of valid stages sorted in pipeline order. """
+        d = const._valid_stages_dict
+        return ", ".join(sorted(d, key=d.__getitem__))
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     @staticmethod
-    def valid_functions_str():
-        """ returns a single string of sorted valid stages, each line showing a valid stage and name. """
-        return const._dict_to_str_lines(const.valid_functions_dict())
+    def stage_num(stage_name):
+        """ returns the pipeline order number of the stage_name string. """
+        return const._valid_stages_dict[stage_name]
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# the pipeline class
+# The pipeline class
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 class pipeline_object:
     """ a ruffus pipeline implementing the stages of TranscriptM. """
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    def require_run_stage(self, stage_num):
+        ans = not ( \
+            (self.restart_at and self.restart_at > round(stage_num, 1)) or \
+            (self.halt_after and self.halt_after < round(stage_num, 1)))
+        print "*** testing stage {0:<3} : {1}".format(stage_num, "Run" if ans else "(no run)")
+        return ans
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def __init__(self, args):
-        """ (routines automatically executed upon instantiation of an instance of this class). """
+        """ (automatically executed upon instantiation of an instance of this class). """
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_restart_halt_stages():
+            """ initializes `self.halt_after` and `self.restart_at` stage number floats """
+            self.halt_after = None
+            self.restart_at = None
             if self.args.halt_after_stage:
-                self.halt_after = float(const.valid_stage_ID(self.args.halt_after_stage))
-            else:
-                self.halt_after = None
-            self.restart_at = None                
+                self.halt_after = float(const.stage_num(self.args.halt_after_stage))
             if self.args.restart_from_stage:
-                self.restart_at = float(const.valid_stage_ID(self.args.restart_from_stage))
+                self.restart_at = float(const.stage_num(self.args.restart_from_stage))
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        def V_metaG_contigs():
+            """ if the metagenome contigs are needed for a required pipeline stage, checks that the file is specified
+                and exists. 
+            """
+            if (self.restart_at != None and self.restart_at > const.stage_num("map_to_reference")) or \
+                    (self.halt_after != None and self.halt_after < const.stage_num("map_to_reference")):
+                pass
+            else:
+                if not self.args.metaG_contigs: 
+                    raise Exception(
+                        "error: argument --metaG_contigs is required when the pipeline "\
+                        "includes stages that map to the reference genome/contigs.")
+                if not os.path.isfile(self.args.metaG_contigs): 
+                    raise Exception(
+                        "File <{0}> specified for metaG_contigs does not exist.".format(self.args.metaG_contigs))
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        def V_dir_bins_list_gff():
+            """ checks the dir_bins argment and instantiates and validates `self.list_gff`: the list of gff files. 
+                if needed for a required pipeline stage.
+            """
+            if (self.restart_at != None and self.restart_at > const.stage_num("summary_tables")) or \
+                    (self.halt_after != None and self.halt_after < const.stage_num("bam_stats")):
+                pass
+            else:
+                if not self.args.dir_bins: 
+                    raise Exception(
+                        "error: argument --dir_bins is required when the pipeline "\
+                        "includes stages that require it.")
+                self.list_gff = list(numpy.sort(self.get_files(self.args.dir_bins, '.gff')))
+                if len(set([os.path.basename(x) for x in self.list_gff])) < len(self.list_gff):
+                    raise Exception ("--dir_bins args \nWarning: some gff files have the same name")
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_ref_genome_phiX():
-            """ instantiates and validates `self.ref_genome_phiX`: the filepath of the reference genome file (PhiX).
+            """ instantiates and validates `self.ref_genome_phiX`: the filepath of the reference genome file (PhiX)
+                if needed for a required pipeline stage.
             """
-            self.ref_genome_phiX = os.path.join(self.args.db_path, '2-PhiX/phiX.fa')
-            if not os.path.isfile(self.ref_genome_phiX):
-                raise Exception(
-                    "The subdirectory 2-PhiX/ or the file %s does not exist in %s (db_path provided)"\
-                    %(os.path.basename(self.ref_genome_phiX), self.args.db_path))
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        def V_list_gff():
-            """ instantiates and validates `self.list_gff`: the list of gff files. """
-            self.list_gff = list(numpy.sort(self.get_files(self.args.dir_bins , '.gff')))
-            if len(set([os.path.basename(x) for x in self.list_gff])) < len(self.list_gff):
-                raise Exception ("--dir_bins args \nWarning: some gff files have the same name")
+            if (self.restart_at != None and self.restart_at > const.stage_num("phiX_removal")) or \
+                    (self.halt_after != None and self.halt_after < const.stage_num("phiX_removal")):
+                pass
+            else:
+                self.ref_genome_phiX = os.path.join(self.args.db_path, '2-PhiX/phiX.fa')
+                if not os.path.isfile(self.ref_genome_phiX):
+                    raise Exception(
+                        "The subdirectory 2-PhiX/ or the file %s does not exist in %s (db_path provided)"\
+                        %(os.path.basename(self.ref_genome_phiX), self.args.db_path))
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_alias_pe():
             """ populates dict `self.alias_pe` of aliases symbolically linked filenames to the paired-end reads.
@@ -214,14 +172,14 @@ class pipeline_object:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def V_SUBDIRS():
             """ sets up constant strings representing basename strings of subdirectories to be created 
-                under the output directory, and clears them from previous runs. 
+                under the output directory. 
             """
             # names of subdirectories:
-            self.SUBDIR_log                = os.path.join(self.args.output_dir, "log")
-            self.SUBDIR_FastQC_raw         = os.path.join(self.args.output_dir, "FastQC_raw")
-            self.SUBDIR_FastQC_processed   = os.path.join(self.args.output_dir, "FastQC_processed")
-            self.SUBDIR_reads_distribution = os.path.join(self.args.output_dir, "reads_distribution")
-            self.SUBDIR_processed_reads    = os.path.join(self.args.output_dir, "processed_reads")
+            self.SUBDIR_log                = os.path.join(self.args.output_dir, "log") # 6
+            self.SUBDIR_FastQC_raw         = os.path.join(self.args.output_dir, "FastQC_raw") # 1
+            self.SUBDIR_FastQC_processed   = os.path.join(self.args.output_dir, "FastQC_processed") # 2 
+            self.SUBDIR_reads_distribution = os.path.join(self.args.output_dir, "reads_distribution") # 6
+            self.SUBDIR_processed_reads    = os.path.join(self.args.output_dir, "processed_reads") # 5.2
             # list of subdirectories to have their contents processed at the end of the pipeline.
             self.SUBDIRS_for_content_renaming = [
                 self.SUBDIR_log,
@@ -233,18 +191,20 @@ class pipeline_object:
             self.SUBDIRS_for_clearing = [
                 self.SUBDIR_reads_distribution
                 ]
-            # Clean the subdirs (of previous run output). ###! Shouldn't we clear the whole output directory?
-            for subdir in [
-                    self.SUBDIR_log,
-                    self.SUBDIR_FastQC_raw,
-                    self.SUBDIR_FastQC_processed,
-                    self.SUBDIR_reads_distribution,
-                    self.SUBDIR_processed_reads
-                    ]:
-                try:
-                    shutil.rmtree(self.SUBDIR_FastQC_raw)
-                except OSError:
-                    pass          
+            # Clean the subdirs (of previous run output) if the relevant stage is to be run.
+            for (stage_name, subdir) in [
+                    ("bam_stats", self.SUBDIR_log), 
+                    ("view_raw_reads", self.SUBDIR_FastQC_raw),
+                    ("trim_raw_reads", self.SUBDIR_FastQC_processed),
+                    ("bam_stats", self.SUBDIR_reads_distribution),
+                    ("prep_for_mapping", self.SUBDIR_processed_reads)]:
+                print (stage_name, subdir)
+                if self.require_run_stage(const.stage_num(stage_name)):
+                    try:
+                        shutil.rmtree(subdir)
+                        print "deleted:", subdir
+                    except OSError:
+                        pass          
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def setup_logging():
             """ sets up Ruffus' standard python logger, which can be synchronised across concurrent Ruffus tasks.
@@ -279,21 +239,25 @@ class pipeline_object:
             #self.logger.setLevel(logging.INFO) #logging.DEBUG
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ''' function control: '''
-        self.args = args             # Store arguments passed.
-#        V_target_tasks()            # Generate and Validate derived arguments...
+        # Store arguments passed:
+        self.args = args             
+        # Validate and set up arguments:
         V_restart_halt_stages()
+        V_metaG_contigs()
+        V_dir_bins_list_gff()
         V_ref_genome_phiX()
-        V_list_gff()
         V_alias_pe()
         V_prefix_pe()
-        V_SUBDIRS()                  # Handle output subdirectories.
-        setup_logging()              # Set up logging.
+        # Handle output subdirectories:
+        V_SUBDIRS()
+        # logging:
+        setup_logging()              
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Helper objects
+    # helpers
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def re_symlink(self, input_file, soft_link_name, logger, logging_mutex):
         """ (helper): relinks soft symbolic link if necessary.
-            (This function from the ruffus website: http://www.ruffus.org.uk/faq.html?highlight=re_symlink) 
+            (This function from the ruffus website: http://www.ruffus.org.uk/faq.html?highlight=re_symlink).
         """
         # Guard against soft linking to oneself: Disastrous consequences of deleting the original files
         if input_file == soft_link_name:
@@ -312,8 +276,7 @@ class pipeline_object:
                     logger.debug("Can't unlink %s" % (soft_link_name))
         with logging_mutex:
             logger.debug("os.symlink(%s, %s)" % (input_file, soft_link_name))
-            #   symbolic link relative to original directory so that the entire path
-            #       can be moved around with breaking everything
+        # symbolic link relative to original dir so that the entire path can be moved around with breaking everything.
         os.symlink(
             os.path.relpath(os.path.abspath(input_file), os.path.abspath(os.path.dirname(soft_link_name))), 
             soft_link_name)
@@ -364,6 +327,8 @@ class pipeline_object:
     def build_pipeline_stages(self):
         """ builds the pipeline by adding ruffus tasks; and returns the built pipeline. """
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Implementation of individual pipeline stages
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 0: count_raw_reads
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         """ This stage counts the total number of reads in each pair of paired-end-reads files. """
@@ -376,7 +341,7 @@ class pipeline_object:
                 Dependencies: `self.args.paired_end`, `self.prefix_pe`.
             """
             self.tot_pe = {}
-            self.prt_progress("PAIRED_END_READ_FILE", "HEADING_2", "HEADING_3", "HEADING_4", "COUNT", "PERCENT")
+            self.prt_progress("sample_name", "step_name", "tool_used", "input_data", "reads_count", "%_total")
             for i in range(int(len(self.args.paired_end)/2)):
                 count = int(subprocess.check_output(
                                 "zcat %s | wc -l " % (self.args.paired_end[2*i]), 
@@ -937,7 +902,7 @@ class pipeline_object:
                 numpy.savetxt(output_file, numpy.transpose(tab), delimiter='\t', fmt="%s") 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def concatenate_logtables(input_files, output_file, logger, logging_mutex):
-            """ Concatenate the summuries of reads distribution from all samples. """
+            """ Concatenate the summaries of reads distribution from all samples. """
             input_files = (' ').join(input_files)
             h = ["sample name","step name","tool used","input data","reads count","% total","% previous step"]  
             header = ('\t').join(h)            
@@ -947,17 +912,17 @@ class pipeline_object:
                 logger.debug("concatenate_logtables: cmdline\n"+cmd)                
             extern.run(cmd)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # abeyance: saving information at the end of each stage, for halting and restarting.
+        # abeyance: saving information at the end of each stage, for halting and restarting of pipeline runs.
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         class abeyance(object):
             """ for disk storage and retrieval of output files from tasks in Ruffus pipeline. """
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            @staticmethod
-            def passthrough(input_files, output_files, stage, logger, logging_mutex):
-                """ used as a task which the ruffus pipeline must pass thing through in a coordinated way. """
-                print "\n*** passthrough locals:", locals()
-                with logging_mutex:     
-                    logger.info("Passing through stage end point for " + stage)
+#            @staticmethod
+#            def passthrough(input_files, output_files, stage, logger, logging_mutex):
+#                """ used as a task which the ruffus pipeline must pass thing through in a coordinated way. """
+#                print "\n*** passthrough locals:", locals()
+#                with logging_mutex:     
+#                    logger.info("Passing through stage end point for " + stage)
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             @staticmethod
             def store(input_filenames, output_filename, logger, logging_mutex):
@@ -977,54 +942,6 @@ class pipeline_object:
                 return output_filenames
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             """ wrappers to provide unqualified names that are unique, as required by ruffus pipeline tasks. """
-            # pass-through checkpoint stages:
-
-#            @staticmethod
-#            def end_symlink_metaT(p1,p2,p3,p4,p5):
-#                abeyance.passthrough(p1,p2,p3,p4,p5) # See for meaningful description.
-#            @staticmethod
-#            def end_trimmomatic(p1,p2,p3,p4,p5):
-#                abeyance.passthrough(p1,p2,p3,p4,p5) # See for meaningful description.
-
-            @staticmethod
-            def end_symlink_metaT(input_files, output_files, stage, logger, logging_mutex):
-                """ used as a task which the ruffus pipeline must pass thing through in a coordinated way. """
-                print "\n*** passthrough locals:", locals()
-                with logging_mutex:     
-                    logger.info("Passing through stage end point for >" + stage)            
-            @staticmethod
-            def end_trimmomatic(input_files, output_files, stage, logger, logging_mutex):
-                """ used as a task which the ruffus pipeline must pass thing through in a coordinated way. """
-                print "\n*** passthrough locals:", locals()
-                with logging_mutex:     
-                    logger.info("Passing through stage end point for " + stage)            
-            @staticmethod
-            def end_phiX_extract(p1,p2,p3,p4,p5):
-                abeyance.passthrough(p1,p2,p3,p4,p5) # See for meaningful description.
-            @staticmethod
-            def end_sortmerna(p1,p2,p3,p4,p5):
-                abeyance.passthrough(p1,p2,p3,p4,p5) # See for meaningful description.
-            @staticmethod
-            def end_concat_for_mapping(p1,p2,p3,p4,p5):
-                abeyance.passthrough(p1,p2,p3,p4,p5) # See for meaningful description.
-            @staticmethod
-            def end_map2ref(p1,p2,p3,p4,p5):
-                abeyance.passthrough(p1,p2,p3,p4,p5) # See for meaningful description.
-            @staticmethod
-            def end_mapping_filter(p1,p2,p3,p4,p5):
-                abeyance.passthrough(p1,p2,p3,p4,p5) # See for meaningful description.
-            @staticmethod
-            def end_bam2normalized_cov(p1,p2,p3,p4,p5):
-                abeyance.passthrough(p1,p2,p3,p4,p5) # See for meaningful description.
-            @staticmethod
-            def end_bam2raw_count(p1,p2,p3,p4,p5):
-                abeyance.passthrough(p1,p2,p3,p4,p5) # See for meaningful description.
-            @staticmethod
-            def end_transcriptM_table(p1,p2,p3,p4,p5):
-                abeyance.passthrough(p1,p2,p3,p4,p5) # See for meaningful description.
-            @staticmethod
-            def end_raw_count_table(p1,p2,p3,p4,p5):
-                abeyance.passthrough(p1,p2,p3,p4,p5) # See for meaningful description.
             # abeyance storage:
             @staticmethod
             def store_symlink_metaT(p1,p2,p3,p4):
@@ -1094,15 +1011,14 @@ class pipeline_object:
             def retrieve_raw_count_table(p1,p2,p3):
                 return abeyance.retrieve(p1,p2,p3) # See for meaningful description.
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # Restarting and halting of stages.
+        # helpers: restarting and halting of stages.
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def require_run_stage(stage_num):
             ans = not ( \
                 (self.restart_at and self.restart_at > round(stage_num, 1)) or \
                 (self.halt_after and self.halt_after < round(stage_num, 1)))
             print "*** testing stage {0:<3} : {1}".format(stage_num, "Run" if ans else "(no run)")
-            #print "*** testing whether stage requires     run: {0:<3} {1}".format(stage_num, ans)
-            return ans
+            return ans 
 
         def require_stage_restart(stage_num):
             ans = self.restart_at and (self.restart_at == round(stage_num, 1))
@@ -1111,44 +1027,45 @@ class pipeline_object:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Build the pipeline.
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl = ruffus.Pipeline.pipelines["main"] # "rpl: 'Ruffus PipeLine'."
+        rpl = ruffus.Pipeline.pipelines["main"] # rpl: 'Ruffus PipeLine'
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 1
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if require_run_stage(1):
-            rpl.originate(task_func = symlink_metaT, # Stage 1a
+            rpl.originate(task_func = symlink_metaT,
                 output = self.alias_pe.keys(), # soft-link filenames of metatranscriptomic paired-end reads.
                 extras = [self.logger, self.logging_mutex]
                 )\
             .follows(calc_tot_pe)\
             .mkdir(self.args.working_dir)
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.merge(task_func = abeyance.store_symlink_metaT, 
-                input = symlink_metaT, 
-                output = os.path.join(self.args.working_dir, 'abeyance_symlink_metaT.output'),
-                extras = [self.logger, self.logging_mutex]
-                )
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.transform(task_func = view_raw_data, # Stage 1aR # Create the first output: a fastqc report of raw DATA
+            rpl.transform(task_func = view_raw_data, # Create the first output: a fastqc report of raw DATA
                 input = symlink_metaT, 
                 filter = ruffus.formatter(),
                 output = os.path.join(self.SUBDIR_FastQC_raw, "{basename[0]}"+"_fastqc.zip"),
                 extras = [self.logger, self.logging_mutex]
                 )\
             .mkdir(self.SUBDIR_FastQC_raw)
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.merge(task_func = abeyance.store_symlink_metaT, 
+                input = symlink_metaT, 
+                output = os.path.join(self.args.working_dir, 'abeyance_symlink_metaT.output'),
+                extras = [self.logger, self.logging_mutex]
+                )\
+            .follows(view_raw_data)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 2
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if require_stage_restart(2):
-            decide_symlink_metaT = abeyance.retrieve_symlink_metaT(
+            decided_symlink_metaT = abeyance.retrieve_symlink_metaT(
                 os.path.join(self.args.working_dir, 'abeyance_symlink_metaT.output'), self.logger, self.logging_mutex)
         else:
-            decide_symlink_metaT = symlink_metaT
+            decided_symlink_metaT = symlink_metaT
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if require_run_stage(2):
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.collate(task_func = trimmomatic, # Stage 2a
-                input = decide_symlink_metaT,
+            rpl.collate(task_func = trimmomatic,
+                input = decided_symlink_metaT,
                 filter = ruffus.regex("R[12].fq.gz$"),
                 output = ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"],
                 extras = [
@@ -1158,32 +1075,33 @@ class pipeline_object:
             .follows(calc_tot_pe)\
             .mkdir(self.args.working_dir)
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.merge(task_func = abeyance.store_trimmomatic,
-                input = trimmomatic, 
-                output = os.path.join(self.args.working_dir, 'abeyance_trimmomatic.output'),
-                extras = [self.logger, self.logging_mutex]
-                )
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.transform(task_func = view_processed_data, # Stage 2aR
+            rpl.transform(task_func = view_processed_data,
                 input = trimmomatic, 
                 filter = ruffus.formatter(),
                 output = os.path.join(self.SUBDIR_FastQC_processed, "{basename[0]}"+"_fastqc.zip"),
                 extras = [self.logger, self.logging_mutex]
                 )\
             .mkdir(self.SUBDIR_FastQC_processed)
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.merge(task_func = abeyance.store_trimmomatic,
+                input = trimmomatic, 
+                output = os.path.join(self.args.working_dir, 'abeyance_trimmomatic.output'),
+                extras = [self.logger, self.logging_mutex]
+                )\
+            .follows(view_processed_data)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 3
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if require_stage_restart(3):
-            decide_trimmomatic = abeyance.retrieve_trimmomatic(
+            decided_trimmomatic = abeyance.retrieve_trimmomatic(
                 os.path.join(self.args.working_dir, 'abeyance_trimmomatic.output'), self.logger, self.logging_mutex)
         else:
-            decide_trimmomatic = trimmomatic
+            decided_trimmomatic = trimmomatic
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if require_run_stage(3):
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.subdivide(task_func = phiX_map, # Stage 3a
-                input = decide_trimmomatic,
+            rpl.subdivide(task_func = phiX_map,
+                input = decided_trimmomatic,
                 filter = ruffus.formatter(r"(.+)/(?P<BASE>.*)P1.fq.gz"),
                 output = [
                     "{path[0]}/phiX.{BASE[0]}P1.bam",
@@ -1192,14 +1110,14 @@ class pipeline_object:
                 extras = [self.logger, self.logging_mutex]
                 )
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.transform(task_func = phiX_ID, # Stage 3b
+            rpl.transform(task_func = phiX_ID,
                 input = phiX_map,
                 filter = ruffus.suffix(".bam"),
                 output = ".txt",
                 extras = [self.logger, self.logging_mutex]
                 )
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.collate(task_func = phiX_concat_ID, # Stage 3c
+            rpl.collate(task_func = phiX_concat_ID,
                 input = phiX_ID, 
                 filter = ruffus.formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),
                 output = '{path[0]}/{BASE[0]}phiX_ID.log',
@@ -1209,13 +1127,13 @@ class pipeline_object:
                 )\
             .follows(calc_tot_pe)\
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.subdivide(task_func = QC_output, # Stage 3d
-                input = decide_trimmomatic,
+            rpl.subdivide(task_func = QC_output, 
+                input = decided_trimmomatic,
                 filter = ruffus.regex(r"trimm_[UP][12].fq.gz"),
                 output = ["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"]
                 )
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.transform(task_func = phiX_extract, # Stage 3e
+            rpl.transform(task_func = phiX_extract, 
                 input = QC_output,
                 filter = ruffus.suffix(".fq.gz"), 
                 add_inputs = ruffus.add_inputs(phiX_concat_ID), 
@@ -1232,15 +1150,15 @@ class pipeline_object:
         # Stage 4
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if require_stage_restart(4):
-            decide_phiX_extract = abeyance.retrieve_phiX_extract(
+            decided_phiX_extract = abeyance.retrieve_phiX_extract(
                 os.path.join(self.args.working_dir, 'abeyance_phiX_extract.output'), self.logger, self.logging_mutex)
         else:
-            decide_phiX_extract = phiX_extract
+            decided_phiX_extract = phiX_extract
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if require_run_stage(4):
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.subdivide(task_func = sortmerna, # Stage 4
-                input = decide_phiX_extract,
+            rpl.subdivide(task_func = sortmerna, 
+                input = decided_phiX_extract,
                 filter = ruffus.formatter(), 
                 output = "{path[0]}/{basename[0]}_non_ncRNA.fq",
                 extras = [
@@ -1257,15 +1175,15 @@ class pipeline_object:
         # Stage 5.2
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if require_stage_restart(5.2):
-            decide_sortmerna = abeyance.retrieve_sortmerna(
+            decided_sortmerna = abeyance.retrieve_sortmerna(
                 os.path.join(self.args.working_dir, 'abeyance_sortmerna.output'), self.logger, self.logging_mutex)
         else:
-            decide_sortmerna = sortmerna
+            decided_sortmerna = sortmerna
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if require_run_stage(5.2):
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.collate(task_func = concat_for_mapping, # Stage 5a
-                input = decide_sortmerna,
+            rpl.collate(task_func = concat_for_mapping, 
+                input = decided_sortmerna,
                 filter = ruffus.regex(r"trimm_.*"),
                 output = ["concat_paired_R1.fq", "concat_paired_R2.fq", "concat_single.fq"],
                 extras = [
@@ -1274,13 +1192,7 @@ class pipeline_object:
                 )\
             .follows(calc_tot_pe)\
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.merge(task_func = abeyance.store_concat_for_mapping, 
-                input = concat_for_mapping, 
-                output = os.path.join(self.args.working_dir, 'abeyance_concat_for_mapping.output'),
-                extras = [self.logger, self.logging_mutex]
-                )
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.transform(task_func = save_processed_reads, # Stage 5aR
+            rpl.transform(task_func = save_processed_reads, 
                 input = concat_for_mapping, 
                 filter = ruffus.formatter(),
                 output = [
@@ -1290,27 +1202,34 @@ class pipeline_object:
                 extras = [self.logger, self.logging_mutex]
                 )\
             .mkdir(self.SUBDIR_processed_reads)
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            rpl.merge(task_func = abeyance.store_concat_for_mapping, 
+                input = concat_for_mapping, 
+                output = os.path.join(self.args.working_dir, 'abeyance_concat_for_mapping.output'),
+                extras = [self.logger, self.logging_mutex]
+                )\
+            .follows(save_processed_reads)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 5.5
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if require_stage_restart(5.5):
-            decide_concat_for_mapping = abeyance.retrieve_concat_for_mapping(
+            decided_concat_for_mapping = abeyance.retrieve_concat_for_mapping(
                 os.path.join(self.args.working_dir, 'abeyance_concat_for_mapping.output'), 
                 self.logger, self.logging_mutex)
         else:
-            decide_concat_for_mapping = concat_for_mapping
+            decided_concat_for_mapping = concat_for_mapping
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if require_run_stage(5.5):
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.transform(task_func = symlink_metaG, # Stage 1b
-                input = self.args.metaG_contigs, # filename of all contigs from the reference metagenome (in a fasta file).
+            rpl.transform(task_func = symlink_metaG, 
+                input = self.args.metaG_contigs, # filename of all contigs from the ref metagenome (in a fasta file).
                 filter = ruffus.formatter(), 
                 output = os.path.join(self.args.working_dir, "{basename[0]}"+".fa"), # put in working directory.
                 extras = [self.logger, self.logging_mutex]
                 )\
             .mkdir(self.args.working_dir)
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.transform(task_func = symlink_metaG_index, # Stage 1c
+            rpl.transform(task_func = symlink_metaG_index, 
                 input = [self.args.metaG_contigs+x for x in ['.amb','.bwt','.ann','.pac','.sa']], 
                 filter = ruffus.formatter(),
                 output = os.path.join(self.args.working_dir,"{basename[0]}{ext[0]}"), # put in working directory.
@@ -1320,8 +1239,8 @@ class pipeline_object:
             .active_if(self.has_index(self.args.metaG_contigs, ['.amb','.bwt','.ann','.pac','.sa']))
                 # Intended to be used when bwa indexes are present.
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.transform(task_func = map2ref, # Stage 5b
-                input = decide_concat_for_mapping, 
+            rpl.transform(task_func = map2ref, 
+                input = decided_concat_for_mapping, 
                 filter = ruffus.formatter(r"(.+)/(?P<BASE>.*)_concat_paired_R1.fq"), 
                 add_inputs = ruffus.add_inputs(symlink_metaG),
                 output = "{path[0]}/{BASE[0]}.bam",
@@ -1341,7 +1260,7 @@ class pipeline_object:
                 extras = [self.logger, self.logging_mutex]
                 )
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.transform(task_func = mapping_filter, # Stage 5c
+            rpl.transform(task_func = mapping_filter, 
                 input = map2ref,
                 filter = ruffus.formatter('.bam'),
                 output = "{path[0]}/{basename[0]}_filtered.bam", 
@@ -1368,23 +1287,23 @@ class pipeline_object:
         """
         if require_stage_restart(6):
             if self.args.no_mapping_filter:  
-                decide_bam_file = abeyance.retrieve_map2ref(
+                decided_bam_file = abeyance.retrieve_map2ref(
                     os.path.join(self.args.working_dir, 'abeyance_map2ref.output'), 
                     self.logger, self.logging_mutex)
             else: 
-                decide_bam_file = abeyance.retrieve_mapping_filter(
+                decided_bam_file = abeyance.retrieve_mapping_filter(
                     os.path.join(self.args.working_dir, 'abeyance_mapping_filter.output'), 
                     self.logger, self.logging_mutex)
         else:
             if self.args.no_mapping_filter:  
-                decide_bam_file = map2ref 
+                decided_bam_file = map2ref 
             else: 
-                decide_bam_file = mapping_filter
+                decided_bam_file = mapping_filter
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if require_run_stage(6):
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.subdivide(task_func = bam2normalized_cov, # Stage 6a
-                input = decide_bam_file, 
+            rpl.subdivide(task_func = bam2normalized_cov, 
+                input = decided_bam_file, 
                 filter = ruffus.formatter(),
                 output = '{path[0]}/*normalized_cov.csv',
                 extras = [
@@ -1399,8 +1318,8 @@ class pipeline_object:
                 extras = [self.logger, self.logging_mutex]
                 )
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.subdivide(task_func = bam2raw_count, # Stage 6b
-                input = decide_bam_file,
+            rpl.subdivide(task_func = bam2raw_count, 
+                input = decided_bam_file,
                 filter = ruffus.formatter(),
                 output = '{path[0]}/*count.csv',
                 extras = [
@@ -1416,7 +1335,7 @@ class pipeline_object:
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             #! Stage 6 reporting - NEED TO CHECK OUT WHERE THESE SHOULD GO.
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.transform(task_func = save_log, # Stage 6R1
+            rpl.transform(task_func = save_log, 
                 input = self.args.working_dir+'/*.log', 
                 filter = ruffus.formatter(".log"),  
                 output = os.path.join(self.SUBDIR_log, "{basename[0]}"+".log"),
@@ -1425,7 +1344,7 @@ class pipeline_object:
             .mkdir(self.SUBDIR_log)\
             .follows(bam2normalized_cov)
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.collate(task_func = logtable, # Stage 6R2  
+            rpl.collate(task_func = logtable, 
                 input = save_log, 
                 filter = 
                     ruffus.formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|" + \
@@ -1436,7 +1355,7 @@ class pipeline_object:
             .mkdir(self.SUBDIR_reads_distribution)\
             .follows(calc_tot_pe)
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.merge(task_func = concatenate_logtables, # Stage 6R3
+            rpl.merge(task_func = concatenate_logtables, 
                 input = logtable, 
                 output = os.path.join(self.args.output_dir, 'summary_reads'), 
                 extras = [self.logger, self.logging_mutex]
@@ -1445,20 +1364,20 @@ class pipeline_object:
         # Stage 7
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if require_stage_restart(7):
-            decide_bam2normalized_cov = abeyance.retrieve_bam2normalized_cov(
+            decided_bam2normalized_cov = abeyance.retrieve_bam2normalized_cov(
                 os.path.join(self.args.working_dir, 'abeyance_bam2normalized_cov.output'), 
                 self.logger, self.logging_mutex)
-            decide_bam2raw_count = abeyance.retrieve_bam2raw_count(
+            decided_bam2raw_count = abeyance.retrieve_bam2raw_count(
                 os.path.join(self.args.working_dir, 'abeyance_bam2raw_count.output'), 
                 self.logger, self.logging_mutex)
         else:
-            decide_bam2normalized_cov = bam2normalized_cov
-            decide_bam2raw_count = bam2raw_count
+            decided_bam2normalized_cov = bam2normalized_cov
+            decided_bam2raw_count = bam2raw_count
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if require_run_stage(7):
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.merge(task_func = transcriptM_table, # Stage 7a # Concatenate all the normalized_cov results in a table
-                input = decide_bam2normalized_cov, 
+            rpl.merge(task_func = transcriptM_table, # Concatenate all the normalized_cov results in a table
+                input = decided_bam2normalized_cov, 
                 output = os.path.join(self.args.output_dir, 
                                       os.path.basename(self.args.output_dir)+'_NORM_COVERAGE.csv'),
                 extras = [self.logger, self.logging_mutex]
@@ -1471,8 +1390,8 @@ class pipeline_object:
                 extras = [self.logger, self.logging_mutex]
                 )
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            rpl.merge(task_func = raw_count_table, # Stage 7b # Concatenate all the raw count in a table
-                input = decide_bam2raw_count,
+            rpl.merge(task_func = raw_count_table, # Concatenate all the raw count in a table
+                input = decided_bam2raw_count,
                 output = os.path.join(self.args.output_dir, os.path.basename(self.args.output_dir)+'_COUNT.csv'),
                 extras = [self.logger, self.logging_mutex]
                 )\
@@ -1523,7 +1442,8 @@ class pipeline_object:
     def run_built_pipeline(self):
         assert self.built_pipeline != None, "The pipeline needs to be built before it can be run."
         verbosity = 0 or int(self.args.verbose[0])
-        self.built_pipeline.run(target_tasks = self.args.target_tasks, logger = self.logger, verbose = verbosity)
+#        self.built_pipeline.run(target_tasks = self.args.target_tasks, logger = self.logger, verbose = verbosity)
+        self.built_pipeline.run(logger = self.logger, verbose = verbosity)
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Post-pipeline activity
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

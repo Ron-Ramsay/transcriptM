@@ -1,23 +1,18 @@
 #!/usr/bin/env python
-""" Main callable module to run TranscriptM: a rapid-throughput pipeline of meta-transcriptomes. 
-    For project notes, see: http://transcriptm.tiddlyspot.com/ 
-"""
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Developer's temporary playground
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# 62: renamed valid_processes class to const."
 
+""" Main callable module to run TranscriptM: a rapid-throughput pipeline of meta-transcriptomes. """
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+debug = False
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-import os        # miscellaneous operating system interfaces. (Python Standard Library module).
-import argparse  # parser for command-line options, arguments and sub-commands. (Python Standard Library module).
+import os        # miscellaneous operating system interfaces.
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # External, non-standard modules
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 import ruffus    # light-weight computational pipeline management. See http://www.ruffus.org.uk.
 import tempdir   # encapsulates temporary directories which just disappear after use. 
-                 # non-standard module. See https://pypi.python.org/pypi/tempdir/
+                 # See https://pypi.python.org/pypi/tempdir/
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Locally written modules
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -31,76 +26,32 @@ def parser_built_with_ruffus():
         our program and the module `ruffus`.
     """
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    class CustomHelpFormatter(argparse.HelpFormatter):
-        """ This class is a remodelling of `argparse.HelpFormatter`.
-            It is used by being passed as a class, to `cmdline.get_argparse(..., formatter_class=CustomHelpFormatter)`.
-            However, in doing so, our custom class redefines methods that are not part of `argparse.HelpFormatter`'s 
-            API. Therefore there exists the potential for our code to break if these methods 
-            (which are supposed to be a non-public implementation) are remodelled in a newer version of `argparse`.
-        """
-        def _split_lines(self, text, width): # redefinition.
-            return text.splitlines()
-        def _get_help_string(self, action): # redefinition.
-            h = action.help
-            if '%(default)' not in action.help:
-                if action.default != '' and action.default != [] and action.default != None:
-                    if action.default is not argparse.SUPPRESS:
-                        defaulting_nargs = [argparse.OPTIONAL, argparse.ZERO_OR_MORE]
-                        if (action.option_strings or action.nargs in defaulting_nargs) :
-                            if not (type(action.default)==str and len(action.default)>50):
-                                if '\n' in h:
-                                    lines = h.splitlines()
-                                    lines[0] += ' [default: %(default)s]'
-                                    h = '\n'.join(lines)
-                                else:
-                                    h += ' [default: %(default)s]'
-            if action.required:
-                if '\n' in h:
-                    lines = h.splitlines()
-                    lines[0] += ' \033[0;32m|REQUIRED\033[00m'
-                    h = '\n'.join(lines)
-                else:
-                    h += ' \033[0;32m|REQUIRED\033[00m'
-            return h
-        def _fill_text(self, text, width, indent): # redefinition.
-            return ''.join([indent + line for line in text.splitlines(True)])
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Instantiate the parser.
     parser = ruffus.cmdline.get_argparse(
         description = '\n'\
-            '                    ==============================                           \n'\
-            '                           TranscriptM v{0}                                  \n'\
-            '                    ==============================                           \n'\
-            '                                                                             \n'\
-            '   ------------------------------------------------------------------------- \n'\
-            '       Process metatranscriptomic data and complete metagenomics analysis    \n'\
-            '   ------------------------------------------------------------------------- \n'\
-            '   e.g. usage:                                                               \n'\
-            'transcriptm --paired_end sample1-1.fq.gz sample1-2.fq.gz sample2-1.fq.gz sample2-2.fq.gz '+\
+            'transcriptm v{0}:\n'\
+            'Metatranscriptomic data processing and complete metagenomics analysis.\n'\
+            'Example usage:\n'\
+            'transcriptm --paired_end sample1-1.fq.gz sample1-2.fq.gz sample2-1.fq.gz sample2-2.fq.gz '\
             '--metaG_contigs assembly.fa --dir_bins dir_gff' \
             .format(transcriptm.__version__), 
         version = "transcriptm v{0}".format(transcriptm.__version__),
-        formatter_class = CustomHelpFormatter,
         ignored_args = ["recreate_database", "key_legend_in_graph", "just_print", "jobs",
-                        "use_threads", "forced_tasks", "touch_files_only", "checksum_file_name"] 
-                        # "target_tasks", "flowchart", "draw_graph_horizontally", "flowchart_format"]
+                        "use_threads", "forced_tasks", "touch_files_only", "checksum_file_name", "target_tasks"]
+                        #, "flowchart", "draw_graph_horizontally", "flowchart_format"]
         )
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # General options:
-    parser._optionals.title = "General options" 
-        # Overwrite the hard-coded title 'optional arguments' for this group of arguments, 
-        # because, presumably, most of these arguments are not optional.
-        # This call seems to delve behind the class's public interface, so this code 
-        # has the potential to break if the underlying implementation is changed in the future.
-
+    parser._optionals.title = "General options" # Overwrite the hard-coded title 'optional arguments' for this group.
+    
     parser.add_argument("--paired_end", nargs="+", dest="paired_end", required=True,
             help="Input files: paired sequences files of raw metatranscriptomics reads (.fq.gz format)\n" +\
             "e.g. --paired_end sample1_1.fq.gz sample1_2.fq.gz sample2_1.fq.gz sample2_2.fq.gz")
 
-    parser.add_argument("--metaG_contigs", dest="metaG_contigs", required=True, 
+    parser.add_argument("--metaG_contigs", dest="metaG_contigs", # required=True, 
             help="All contigs from the reference metagenome in a fasta file")
 
-    parser.add_argument("--dir_bins", dest="dir_bins", required=True,
+    parser.add_argument("--dir_bins", dest="dir_bins", # required=True,
             help="Directory which contains several annotated population genomes (bins)\n" +\
             "-> gff format, the others files would be ignored")
 
@@ -109,12 +60,11 @@ def parser_built_with_ruffus():
     parser.add_argument("--halt_after_stage", dest="halt_after_stage",
             help=\
             "An intermediate stage. After this stage is completed, the pipeline run will halt.\n"\
-            "Available options are as follows. Use either the ID (without the bracket) OR the text-string:\n"\
-            + tm_pipeline.const.valid_stages_str() +\
+            "Available options: [" + tm_pipeline.const.valid_stages_str() + "].\n"\
             "Important: The pipeline may later be restarted from the next stage (or previous stages), but note:\n"\
             " (i) the same `--paired_end` arguments must be supplied "\
             "in exactly the SAME ORDER as before,\n else mismatching will occur; and "\
-            "(ii) the `--working_dir` argument must be specified explicitly,\n"\
+            "(ii) the `--working_dir` argument must be specified explicitly\n"\
             " and the data must be retained in the specified directory between runs.")
 
     parser.add_argument("--restart_from_stage", dest="restart_from_stage",
@@ -124,8 +74,8 @@ def parser_built_with_ruffus():
             "NB. See important notes in the help for option `--halt_after_stage`.")
 
     # General option: TranscriptM database path:
-    db_path=None    
-    try :
+    db_path = None    
+    try:
         db_path = os.environ['TRANSCRIPTM_DATABASE'] # Check if the db is an environment variable.
     except KeyError:
         pass 
@@ -148,13 +98,13 @@ def parser_built_with_ruffus():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Trimmomatic options:
-    trimm_args=parser.add_argument_group('Trimmomatic options')
+    trimm_args = parser.add_argument_group('Trimmomatic options')
     trimm_args.add_argument('--adapters', choices=['nextera', 'truseq'], default='truseq', 
                                     help="Type of adapters to clip")
     trimm_args.add_argument('--min_len', help="Minimum required length of read", type=int, default = 30)
     trimm_args.add_argument('--min_avg_qc', type=int, default=25, 
                                     help="Minimum average quality score for 4 bp windows")
-    trimm_args.add_argument('--phred', help="Quality encoding", choices=['phred33', 'phred64'],default='phred33')
+    trimm_args.add_argument('--phred', help="Quality encoding", choices=['phred33', 'phred64'], default='phred33')
     trimm_args.add_argument('--min_qc', type=int, default=20, 
                                     help="Minimum quality score for leading and trailing bases")
     trimm_args.add_argument('--crop', help="Cut read to a specific length", type=int, default = 10000)
@@ -162,7 +112,7 @@ def parser_built_with_ruffus():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # SortMeRNA options:
-    sortmerna_args=parser.add_argument_group('SortMeRNA options')    
+    sortmerna_args = parser.add_argument_group('SortMeRNA options')    
     if db_path:
         path_rRNA = os.path.join(db_path, "1-SortMeRNA/rRNA_databases")
         path_tRNA = os.path.join(db_path, "1-SortMeRNA/tRNA_databases")
@@ -194,7 +144,7 @@ def parser_built_with_ruffus():
                 "NB: index must be created with the script sortmerna/2.0/bin/indexdb_rna")
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Mapping options (BamM filter):
-    mapping_args=parser.add_argument_group('Mapping options (BamM filter)')
+    mapping_args = parser.add_argument_group('Mapping options (BamM filter)')
     mapping_args.add_argument('--percentage_id', type=float, dest='percentage_id', default=0.97, 
                               help='Minimum allowable percentage base identity of a mapped read')
     mapping_args.add_argument('--percentage_aln', type=float, default=0.95, dest='percentage_aln', 
@@ -203,11 +153,11 @@ def parser_built_with_ruffus():
                               help='Do not adjust the mapping stringency by filtering alignments')
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     return parser
-    
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-def further_process_args(args):
-    """ performs further validations on `args` (parsed command-line arguments), 
-        and creates additional derived args in that namespace.
+def process_args(args):
+    """ performs further validations on `args` (parsed command-line arguments), and creates additional derived args 
+        in that namespace. Some arguments will only be required for certain stages of the pipeline,
+        and they should be checked by the pipeline object itself when it is instantiated.
     """
     ''' Note: vars(args) can be used to update the `args` Namespace object as a virtual dictionary. 
             i.e. it is synonymous with `args._dict__`
@@ -216,63 +166,40 @@ def further_process_args(args):
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def V_stages():
         """ checks supplied arguments `--halt_after_stage` and `--restart_from_stage`. """
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # validate this parameter:
-        if args.halt_after_stage: # check this parameter only if it was specified.
-            badness = False # initialize flag.
-            if args.halt_after_stage[0].isdigit(): # Stage begins with a digit, so is a stage id.
-                if args.halt_after_stage not in tm_pipeline.const.valid_stages_dict().keys(): 
-                    badness = True
-            else:
-                if args.halt_after_stage not in tm_pipeline.const.valid_stages_dict().values():
-                    badness = True
-            if badness:                    
-                raise Exception(
-                    "\nStage <{0}> specified in --halt_after_stage is not valid,\n".format(args.halt_after_stage) +\
-                    "i.e. not a valid ID or NAME (choose just either an ID or name) from the following:\n" \
-                     + tm_pipeline.const.valid_stages_str())
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # validate this parameter:
-        if args.restart_from_stage: # check this parameter only if it was specified.
-            badness = False # initialize flag.
-            if args.restart_from_stage[0].isdigit(): # Stage begins with a digit, so is a stage id.
-                if args.restart_from_stage not in tm_pipeline.const.valid_stages_dict().keys(): 
-                    badness = True
-            else:
-                if args.restart_from_stage not in tm_pipeline.const.valid_stages_dict().values():
-                    badness = True
-            if badness:                    
-                raise Exception(
-                    "\nStage <{0}> specified in `--restart_from_stage` is not valid,\n"\
-                    .format(args.restart_from_stage) +\
-                    "i.e. not a valid ID or NAME (choose just either an ID or name) from the following:\n" \
-                     + tm_pipeline.const.valid_stages_str())
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # validate parameter halt_after_stage:
+        if args.halt_after_stage and not tm_pipeline.const.is_valid_stage(args.halt_after_stage):
+            raise Exception(
+                "\n--halt_after_stage <{0}> is invalid,\n".format(args.halt_after_stage) +\
+                "Choose one of the following: " + tm_pipeline.const.valid_stages_str())
+        # validate parameter restart_from_stage:
+        if args.restart_from_stage and not tm_pipeline.const.is_valid_stage(args.restart_from_stage):
+            raise Exception(
+                "\n--restart_from_stage <{0}> is invalid,\n".format(args.restart_from_stage) +\
+                "Choose one of the following: " + tm_pipeline.const.valid_stages_str())
         # Check if a working directory needs to be specified.
         if (args.halt_after_stage or args.restart_from_stage) and not args.working_dir:                    
             raise Exception(
                 "\nWorking directory `--working_dir` must be specified when either "\
                 "`--halt_after_stage` or `--restart_from_stage` are used.")
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Ensure the halt-stage is not earlier in the pipeline than the restart-stage.
         if (args.halt_after_stage and args.restart_from_stage):
-#            print "***", tm_pipeline.const.valid_stage_ID(args.halt_after_stage)
-#            print "***", tm_pipeline.const.valid_stage_ID(args.restart_from_stage)
-            if \
-              float(tm_pipeline.const.valid_stage_ID(args.halt_after_stage)) < \
-              float(tm_pipeline.const.valid_stage_ID(args.restart_from_stage)
-                ):
+            if tm_pipeline.const.stage_num(args.halt_after_stage) < \
+                    tm_pipeline.const.stage_num(args.restart_from_stage):
                 raise Exception(
-                "\nThe `--halt_after_stage` <{0} {1}> must not be earlier in the pipeline than ".format(
-                tm_pipeline.const.valid_stage_ID(args.halt_after_stage), 
-                tm_pipeline.const.valid_stages_dict().get(args.halt_after_stage, args.halt_after_stage)) +\
-                "the `--restart_from_stage` <{0} {1}>.".format(
-                tm_pipeline.const.valid_stage_ID(args.restart_from_stage), 
-                tm_pipeline.const.valid_stages_dict().get(args.restart_from_stage, args.restart_from_stage))
-                )
+                    "\n`--halt_after_stage` <{0}> (pipeline stage {1}) must not be earlier in the pipeline than "\
+                        .format(
+                            args.halt_after_stage, 
+                            tm_pipeline.const.stage_num(args.halt_after_stage)) +\
+                    "`--restart_from_stage` <{0}> (pipeline stage {1})."\
+                        .format(
+                            args.restart_from_stage, 
+                            tm_pipeline.const.stage_num(args.restart_from_stage))
+                    )
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def V_paired_end():
-        """ checks that all the paired end files exist. """
+        """ checks that the paired end files are specified and that all exist. """
+        if not args.paired_end:
+            raise Exception("--paired_end files must be specified.")
         for filename in args.paired_end:
             if not os.path.isfile(filename):
                 raise Exception("File <{0}> specified in --paired_end does not exist.".format(filename))
@@ -320,16 +247,12 @@ def debug_namespace(namespace):
         print "> {0}: {2} {1}".format(index, type(val), val)
     print
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-def main_prog():
-    """ main program control. """
-    parser = parser_built_with_ruffus()    # Initialise a custom Rufus commond-line parser.
-    args = parser.parse_args()             # Parse the command line.
-    further_process_args(args)             # Perform further argument validation and creation.
-    #debug_namespace(args)                 # for debugging.
-    pl = tm_pipeline.pipeline_object(args) # Instantiate a custom Pipeline object.
-    pl.build_pipeline_stages()
-    pl.run_built_pipeline()
-    pl.clear()
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 if __name__ == '__main__':
-    main_prog()
+    parser = parser_built_with_ruffus()     # Initialise a custom Rufus commond-line parser.
+    args = parser.parse_args()              # Parse the command line.
+    process_args(args)                      # Validation and creation of arguments.
+    if debug: debug_namespace(args)         # Print out the user's arguments if debugging.
+    pl = tm_pipeline.pipeline_object(args)  # custom pipeline object instantiation.
+    pl.build_pipeline_stages()              # Build the ruffus pipeline, making further checks on parameters.
+    pl.run_built_pipeline()                 # Run the ruffus pipeline.
+    pl.clear()                              # Tidy up afterwards.

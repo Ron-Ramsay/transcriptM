@@ -74,7 +74,7 @@ def parser_built_with_ruffus():
             "NB. See important notes in the help for option `--halt_after_stage`.")
 
     # General option: TranscriptM database path:
-    db_path = None    
+    db_path = None
     try:
         db_path = os.environ['TRANSCRIPTM_DATABASE'] # Check if the db is an environment variable.
     except KeyError:

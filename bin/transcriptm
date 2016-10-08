@@ -36,22 +36,22 @@ def parser_built_with_ruffus():
             '--metaG_contigs assembly.fa --dir_bins dir_gff' \
             .format(transcriptm.__version__), 
         version = "transcriptm v{0}".format(transcriptm.__version__),
-        ignored_args = ["recreate_database", "key_legend_in_graph", "just_print", "jobs",
-                        "use_threads", "forced_tasks", "touch_files_only", "checksum_file_name", "target_tasks"]
-                        #, "flowchart", "draw_graph_horizontally", "flowchart_format"]
+        ignored_args = ["recreate_database", "key_legend_in_graph", "jobs",
+                        "use_threads", "forced_tasks", "touch_files_only", "checksum_file_name", "target_tasks" ] #, 
+                        #"flowchart", "draw_graph_horizontally", "flowchart_format", "just_print"]
         )
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # General options:
     parser._optionals.title = "General options" # Overwrite the hard-coded title 'optional arguments' for this group.
     
-    parser.add_argument("--paired_end", nargs="+", dest="paired_end", required=True,
-            help="Input files: paired sequences files of raw metatranscriptomics reads (.fq.gz format)\n" +\
+    parser.add_argument("--paired_end", nargs="+", dest="paired_end",  required=True,
+            help="required input files: paired sequences files of raw metatranscriptomics reads (.fq.gz format)\n" +\
             "e.g. --paired_end sample1_1.fq.gz sample1_2.fq.gz sample2_1.fq.gz sample2_2.fq.gz")
 
-    parser.add_argument("--metaG_contigs", dest="metaG_contigs", # required=True, 
+    parser.add_argument("--metaG_contigs", dest="metaG_contigs", 
             help="All contigs from the reference metagenome in a fasta file")
 
-    parser.add_argument("--dir_bins", dest="dir_bins", # required=True,
+    parser.add_argument("--dir_bins", dest="dir_bins", 
             help="Directory which contains several annotated population genomes (bins)\n" +\
             "-> gff format, the others files would be ignored")
 
@@ -166,22 +166,28 @@ def process_args(args):
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def V_stages():
         """ checks supplied arguments `--halt_after_stage` and `--restart_from_stage`. """
-        # validate parameter halt_after_stage:
+        # Validate parameter halt_after_stage:
         if args.halt_after_stage and not tm_pipeline.const.is_valid_stage(args.halt_after_stage):
             raise Exception(
                 "\n--halt_after_stage <{0}> is invalid,\n".format(args.halt_after_stage) +\
                 "Choose one of the following: " + tm_pipeline.const.valid_stages_str())
-        # validate parameter restart_from_stage:
+        # Validate parameter restart_from_stage:
         if args.restart_from_stage and not tm_pipeline.const.is_valid_stage(args.restart_from_stage):
             raise Exception(
                 "\n--restart_from_stage <{0}> is invalid,\n".format(args.restart_from_stage) +\
                 "Choose one of the following: " + tm_pipeline.const.valid_stages_str())
-        # Check if a working directory needs to be specified.
+        # Check if a working directory needs to be specified:
         if (args.halt_after_stage or args.restart_from_stage) and not args.working_dir:                    
             raise Exception(
                 "\nWorking directory `--working_dir` must be specified when either "\
                 "`--halt_after_stage` or `--restart_from_stage` are used.")
-        # Ensure the halt-stage is not earlier in the pipeline than the restart-stage.
+        # When restarting, check that the working directory exists:
+        if args.restart_from_stage != None and not os.path.isdir(args.working_dir): 
+            raise Exception(
+                "\nWhen specifying a `--restart_from_stage`, the working directory `--working_dir` must exist, "\
+                "(and it must contain the data retained from previous runs), "\
+                "however, directory <{0}> does not exist.".format(args.working_dir))
+        # Ensure the halt-stage is not earlier in the pipeline than the restart-stage:
         if (args.halt_after_stage and args.restart_from_stage):
             if tm_pipeline.const.stage_num(args.halt_after_stage) < \
                     tm_pipeline.const.stage_num(args.restart_from_stage):

@@ -2,6 +2,8 @@
 
 """ Implements the pipeline object for TranscriptM: a rapid-throughput pipeline of meta-transcriptomes. """
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+debug = False
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Python Standard Library modules
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 import collections   # high-performance container datatypes.
@@ -39,7 +41,7 @@ class const(object):
         "prep_for_mapping": 5.2,
         "map_to_reference": 5.5,
         "bam_stats":        6,
-        "summary_tables":   7}
+        "summary_tables":   7 }
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     @staticmethod
     def is_valid_stage(stage_name):
@@ -62,12 +64,21 @@ class const(object):
 class pipeline_object:
     """ a ruffus pipeline implementing the stages of TranscriptM. """
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # helpers: restarting and halting of stages.
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def require_run_stage(self, stage_num):
         ans = not ( \
             (self.restart_at and self.restart_at > round(stage_num, 1)) or \
             (self.halt_after and self.halt_after < round(stage_num, 1)))
-        print "*** testing stage {0:<3} : {1}".format(stage_num, "Run" if ans else "(no run)")
+        #print "*** testing stage {0:<3} : {1}".format(stage_num, "Run" if ans else "(no run)")
         return ans
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    def require_stage_restart(self, stage_num):
+        ans = self.restart_at and (self.restart_at == round(stage_num, 1))
+        #print "*** testing stage {0:<3} : {1}".format(stage_num, "Restart from here" if ans else "(no restart)")
+        return ans
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # helpers: restarting and halting of stages.
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def __init__(self, args):
         """ (automatically executed upon instantiation of an instance of this class). """
@@ -198,7 +209,7 @@ class pipeline_object:
                     ("trim_raw_reads", self.SUBDIR_FastQC_processed),
                     ("bam_stats", self.SUBDIR_reads_distribution),
                     ("prep_for_mapping", self.SUBDIR_processed_reads)]:
-                print (stage_name, subdir)
+#                print (stage_name, subdir)
                 if self.require_run_stage(const.stage_num(stage_name)):
                     try:
                         shutil.rmtree(subdir)
@@ -233,10 +244,15 @@ class pipeline_object:
             #print "self.args.verbose:", self.args.verbose, type(self.args.verbose)
             #print "self.args.verbose:", self.args.verbose, type(args.verbose)
             #self.logger, self.logging_mutex = ruffus.cmdline.setup_logging(__name__, args.log_file, self.args.verbose)
-            verbosity = 0 or int(self.args.verbose[0])
-            self.logger, self.logging_mutex = ruffus.cmdline.setup_logging(__name__, args.log_file, verbosity)
+
+            #verbosity = 0 or int(self.args.verbose[0])
+            #self.logger, self.logging_mutex = ruffus.cmdline.setup_logging(__name__, args.log_file, verbosity)
+
             #print type(self.logger)
-            #self.logger.setLevel(logging.INFO) #logging.DEBUG
+            #self.logger.setLevel(logging.INFO) #logging.DEBUG            
+            
+            (self.logger, self.logging_mutex) = ruffus.cmdline.setup_logging(__name__, args.log_file, args.verbose)
+
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ''' function control: '''
         # Store arguments passed:
@@ -290,12 +306,12 @@ class pipeline_object:
                     list_files.append(os.path.join(root, f))
         return list_files
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    def has_index(self, f, list_extension):
-        """ (helper): check if a file f has index 
+    def has_index(self, f, list_extensions):
+        """ (helper): check if a file f has index,
             (if its directory also contains files ending with extensions given in a list).
         """
         index = True 
-        for ext in list_extension:
+        for ext in list_extensions:
             if not os.path.exists(f + ext):
                 index = False
                 break
@@ -341,7 +357,8 @@ class pipeline_object:
                 Dependencies: `self.args.paired_end`, `self.prefix_pe`.
             """
             self.tot_pe = {}
-            self.prt_progress("sample_name", "step_name", "tool_used", "input_data", "reads_count", "%_total")
+            self.prt_progress("sample_name", "step_name", "tool_used", "input_data", "reads_count", " %_total")
+            self.prt_progress("-----------", "---------", "---------", "----------", "-----------", "--------")
             for i in range(int(len(self.args.paired_end)/2)):
                 count = int(subprocess.check_output(
                                 "zcat %s | wc -l " % (self.args.paired_end[2*i]), 
@@ -349,7 +366,8 @@ class pipeline_object:
                             .split(' ')[0])/4  #! is this method always accurate, e.g. if extra comment lines in file?
                 self.tot_pe[self.prefix_pe['sample-'+str(i)]]=count
                 self.prt_progress(\
-                    self.prefix_pe['sample-'+str(i)], 'raw data', 'FastQC-check', 'raw reads', str(count), '100.00 %')
+                    self.prefix_pe['sample-'+str(i)], 'raw data', 'zcat | wc -l', 'raw reads', str(count), '100.00 %')
+#                    self.prefix_pe['sample-'+str(i)], 'raw data', 'FastQC-check', 'raw reads', str(count), '100.00 %')
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 1: view_raw_reads
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -597,7 +615,8 @@ class pipeline_object:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Map separately paired-end and singletons with 'BamM' and merge the results in one .bam file
         # WARNINGS
-        #1. .bam files generated with 'BamM' only contain the mapped reads -> be carful with the interpretation of samtools flagstat
+        #1. .bam files generated with 'BamM' only contain the mapped reads -> 
+        #       be carful with the interpretation of samtools flagstat
         #2. only one alignment per read is kept: the secondary and supplementary are removed
         def map2ref(input_files, output_file, bams, flagstat, logger, logging_mutex):
             """ BamM make. Map all metatranscriptomics reads against metagenomics contigs. """
@@ -917,13 +936,6 @@ class pipeline_object:
         class abeyance(object):
             """ for disk storage and retrieval of output files from tasks in Ruffus pipeline. """
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#            @staticmethod
-#            def passthrough(input_files, output_files, stage, logger, logging_mutex):
-#                """ used as a task which the ruffus pipeline must pass thing through in a coordinated way. """
-#                print "\n*** passthrough locals:", locals()
-#                with logging_mutex:     
-#                    logger.info("Passing through stage end point for " + stage)
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             @staticmethod
             def store(input_filenames, output_filename, logger, logging_mutex):
                 """ saves filenames (various structures of strings) to disk in JSON format; does a log entry. """
@@ -935,11 +947,18 @@ class pipeline_object:
             @staticmethod
             def retrieve(input_file, logger, logging_mutex):
                 """ retrieves filenames (various structures of strings) from disk in JSON format; does a log entry. """
-                with open(input_file, 'r') as infile:
-                    output_filenames = json.load(infile)
-                with logging_mutex:     
-                    logger.info("Retrieved abeyance output filenames from " + input_file)
-                return output_filenames
+                try:
+                    infile = open(input_file, 'r')
+                except:
+                    raise Exception(
+                        "\nAttempt to open file <{0}> failed when attempting a restart at an intermittent stage. "\
+                        "Ensure that the pipeline has already been run up to this point.".format(input_file))
+                else:
+                    with open(input_file, 'r') as infile:
+                        output_filenames = json.load(infile)
+                    with logging_mutex:     
+                        logger.info("Retrieved abeyance output filenames from " + input_file)
+                    return output_filenames
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             """ wrappers to provide unqualified names that are unique, as required by ruffus pipeline tasks. """
             # abeyance storage:
@@ -1011,27 +1030,13 @@ class pipeline_object:
             def retrieve_raw_count_table(p1,p2,p3):
                 return abeyance.retrieve(p1,p2,p3) # See for meaningful description.
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # helpers: restarting and halting of stages.
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        def require_run_stage(stage_num):
-            ans = not ( \
-                (self.restart_at and self.restart_at > round(stage_num, 1)) or \
-                (self.halt_after and self.halt_after < round(stage_num, 1)))
-            print "*** testing stage {0:<3} : {1}".format(stage_num, "Run" if ans else "(no run)")
-            return ans 
-
-        def require_stage_restart(stage_num):
-            ans = self.restart_at and (self.restart_at == round(stage_num, 1))
-            print "*** testing stage {0:<3} : {1}".format(stage_num, "Restart from here" if ans else "(no restart)")
-            return ans
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Build the pipeline.
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         rpl = ruffus.Pipeline.pipelines["main"] # rpl: 'Ruffus PipeLine'
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 1
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        if require_run_stage(1):
+        if self.require_run_stage(1):
             rpl.originate(task_func = symlink_metaT,
                 output = self.alias_pe.keys(), # soft-link filenames of metatranscriptomic paired-end reads.
                 extras = [self.logger, self.logging_mutex]
@@ -1056,13 +1061,13 @@ class pipeline_object:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 2
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        if require_stage_restart(2):
+        if self.require_stage_restart(2):
             decided_symlink_metaT = abeyance.retrieve_symlink_metaT(
                 os.path.join(self.args.working_dir, 'abeyance_symlink_metaT.output'), self.logger, self.logging_mutex)
         else:
             decided_symlink_metaT = symlink_metaT
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        if require_run_stage(2):
+        if self.require_run_stage(2):
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.collate(task_func = trimmomatic,
                 input = decided_symlink_metaT,
@@ -1092,13 +1097,13 @@ class pipeline_object:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 3
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        if require_stage_restart(3):
+        if self.require_stage_restart(3):
             decided_trimmomatic = abeyance.retrieve_trimmomatic(
                 os.path.join(self.args.working_dir, 'abeyance_trimmomatic.output'), self.logger, self.logging_mutex)
         else:
             decided_trimmomatic = trimmomatic
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        if require_run_stage(3):
+        if self.require_run_stage(3):
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.subdivide(task_func = phiX_map,
                 input = decided_trimmomatic,
@@ -1149,13 +1154,13 @@ class pipeline_object:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 4
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        if require_stage_restart(4):
+        if self.require_stage_restart(4):
             decided_phiX_extract = abeyance.retrieve_phiX_extract(
                 os.path.join(self.args.working_dir, 'abeyance_phiX_extract.output'), self.logger, self.logging_mutex)
         else:
             decided_phiX_extract = phiX_extract
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        if require_run_stage(4):
+        if self.require_run_stage(4):
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.subdivide(task_func = sortmerna, 
                 input = decided_phiX_extract,
@@ -1174,13 +1179,13 @@ class pipeline_object:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 5.2
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        if require_stage_restart(5.2):
+        if self.require_stage_restart(5.2):
             decided_sortmerna = abeyance.retrieve_sortmerna(
                 os.path.join(self.args.working_dir, 'abeyance_sortmerna.output'), self.logger, self.logging_mutex)
         else:
             decided_sortmerna = sortmerna
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        if require_run_stage(5.2):
+        if self.require_run_stage(5.2):
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.collate(task_func = concat_for_mapping, 
                 input = decided_sortmerna,
@@ -1212,14 +1217,14 @@ class pipeline_object:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 5.5
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        if require_stage_restart(5.5):
+        if self.require_stage_restart(5.5):
             decided_concat_for_mapping = abeyance.retrieve_concat_for_mapping(
                 os.path.join(self.args.working_dir, 'abeyance_concat_for_mapping.output'), 
                 self.logger, self.logging_mutex)
         else:
             decided_concat_for_mapping = concat_for_mapping
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        if require_run_stage(5.5):
+        if self.require_run_stage(5.5):
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.transform(task_func = symlink_metaG, 
                 input = self.args.metaG_contigs, # filename of all contigs from the ref metagenome (in a fasta file).
@@ -1285,7 +1290,7 @@ class pipeline_object:
             (b) determines whether the inputs for bam2raw_count() and bam2normalized_cov() are taken directly 
                 from map2ref() or whether they are taken from the subsequent mapping_filter().
         """
-        if require_stage_restart(6):
+        if self.require_stage_restart(6):
             if self.args.no_mapping_filter:  
                 decided_bam_file = abeyance.retrieve_map2ref(
                     os.path.join(self.args.working_dir, 'abeyance_map2ref.output'), 
@@ -1300,7 +1305,7 @@ class pipeline_object:
             else: 
                 decided_bam_file = mapping_filter
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        if require_run_stage(6):
+        if self.require_run_stage(6):
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.subdivide(task_func = bam2normalized_cov, 
                 input = decided_bam_file, 
@@ -1363,7 +1368,7 @@ class pipeline_object:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 7
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        if require_stage_restart(7):
+        if self.require_stage_restart(7):
             decided_bam2normalized_cov = abeyance.retrieve_bam2normalized_cov(
                 os.path.join(self.args.working_dir, 'abeyance_bam2normalized_cov.output'), 
                 self.logger, self.logging_mutex)
@@ -1374,7 +1379,7 @@ class pipeline_object:
             decided_bam2normalized_cov = bam2normalized_cov
             decided_bam2raw_count = bam2raw_count
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        if require_run_stage(7):
+        if self.require_run_stage(7):
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             rpl.merge(task_func = transcriptM_table, # Concatenate all the normalized_cov results in a table
                 input = decided_bam2normalized_cov, 
@@ -1406,6 +1411,7 @@ class pipeline_object:
         # Assign the ruffus pipeline to the object.
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         self.built_pipeline = rpl
+        print "Pipeline built."
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # PIPELINE: RUN
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1436,14 +1442,19 @@ class pipeline_object:
         #rpl.run(target_tasks = self.target_tasks, logger = self.logger, verbose = v) # verbose = 0 defaults to 1
 #        rpl.run(target_tasks = self.target_tasks, logger = self.logger, verbose = v) # verbose = 0 defaults to 1
         #rpl.run(target_tasks = self.target_tasks, logger = self.logger, verbose = v) # verbose = 0 defaults to 1
+
+        #verbosity = 0 or int(self.args.verbose[0])
+#        self.built_pipeline.run(target_tasks = self.args.target_tasks, logger = self.logger, verbose = verbosity)
+#        print "debug: about to run cmdline"
+#        ruffus.cmdline.run(self.args)
+        #self.built_pipeline.run(logger = self.logger, verbose = verbosity)
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Run the pipeline
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def run_built_pipeline(self):
         assert self.built_pipeline != None, "The pipeline needs to be built before it can be run."
-        verbosity = 0 or int(self.args.verbose[0])
-#        self.built_pipeline.run(target_tasks = self.args.target_tasks, logger = self.logger, verbose = verbosity)
-        self.built_pipeline.run(logger = self.logger, verbose = verbosity)
+        print "Pipeline running..."
+        ruffus.cmdline.run(self.args)
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Post-pipeline activity
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

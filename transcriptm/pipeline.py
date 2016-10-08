@@ -209,7 +209,6 @@ class pipeline_object:
                     ("trim_raw_reads", self.SUBDIR_FastQC_processed),
                     ("bam_stats", self.SUBDIR_reads_distribution),
                     ("prep_for_mapping", self.SUBDIR_processed_reads)]:
-#                print (stage_name, subdir)
                 if self.require_run_stage(const.stage_num(stage_name)):
                     try:
                         shutil.rmtree(subdir)
@@ -223,36 +222,7 @@ class pipeline_object:
                     `logger`: forwards logging calls across jobs.
                     `logging_mutex`: prevents different jobs which are logging simultaneously from being jumbled up.
             """   
-            #import logging
-            
-            #self.logger, self.logging_mutex = ruffus.cmdline.setup_logging(__name__, args.log_file, args.verbose)
-#            (self.logger, self.logging_mutex) = ruffus.cmdline.setup_logging(
-#                    module_name = __name__, 
-#                    log_file_name = args.log_file, # by default, Ruffus logs to STDERR.
-#                    #verbose = 0)
-#                    verbose = args.verbose) # By default, 1: Ruffus logs each task and each job as it is completed.
-            #self.logger.setLevel = logging.INFO #logging.DEBUG
-            
-            
-#            import ruffus.proxy_logger
-#            (self.logger, self.logging_mutex) = ruffus.proxy_logger.make_shared_logger_and_proxy(
-#                    ruffus.proxy_logger.setup_std_shared_logger,
-#                    "my_logger",
-#                    {"file_name" : args.log_file})
-                    
-            #self.logger, self.logging_mutex = ruffus.cmdline.setup_logging(__name__, args.log_file, int(self.args.verbose[0]))
-            #print "self.args.verbose:", self.args.verbose, type(self.args.verbose)
-            #print "self.args.verbose:", self.args.verbose, type(args.verbose)
-            #self.logger, self.logging_mutex = ruffus.cmdline.setup_logging(__name__, args.log_file, self.args.verbose)
-
-            #verbosity = 0 or int(self.args.verbose[0])
-            #self.logger, self.logging_mutex = ruffus.cmdline.setup_logging(__name__, args.log_file, verbosity)
-
-            #print type(self.logger)
-            #self.logger.setLevel(logging.INFO) #logging.DEBUG            
-            
             (self.logger, self.logging_mutex) = ruffus.cmdline.setup_logging(__name__, args.log_file, args.verbose)
-
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ''' function control: '''
         # Store arguments passed:
@@ -307,8 +277,8 @@ class pipeline_object:
         return list_files
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def has_index(self, f, list_extensions):
-        """ (helper): check if a file f has index,
-            (if its directory also contains files ending with extensions given in a list).
+        """ (helper): check if a file f has index: i.e. if its directory also contains files ending with extensions 
+            given in a list.
         """
         index = True 
         for ext in list_extensions:
@@ -336,7 +306,8 @@ class pipeline_object:
         """ prints out the provided parameters as a line formated in standard column widths.
             This function probably belongs in module Monitoring, but is put here until that is sorted out.
         """
-        print "{0:21} {1:16} {2:16} {3:20} {4:>12}  {5:>8}".format(name_sample, p2, p3, p4, p5, p6)
+        maxlen = max(len(s) for s in self.prefix_pe.values())
+        print "{0:{1}}  {2:16} {3:16} {4:20} {5:>12}  {6:>8}".format(name_sample, maxlen, p2, p3, p4, p5, p6)
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Pipeline Stages
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -357,17 +328,16 @@ class pipeline_object:
                 Dependencies: `self.args.paired_end`, `self.prefix_pe`.
             """
             self.tot_pe = {}
-            self.prt_progress("sample_name", "step_name", "tool_used", "input_data", "reads_count", " %_total")
-            self.prt_progress("-----------", "---------", "---------", "----------", "-----------", "--------")
+            self.prt_progress("sample_name", "step", "tool_used", "input_data", "reads_count", " %_total")
+            self.prt_progress("-----------", "----", "---------", "----------", "-----------", "--------")
             for i in range(int(len(self.args.paired_end)/2)):
                 count = int(subprocess.check_output(
                                 "zcat %s | wc -l " % (self.args.paired_end[2*i]), 
                                 shell=True)
-                            .split(' ')[0])/4  #! is this method always accurate, e.g. if extra comment lines in file?
-                self.tot_pe[self.prefix_pe['sample-'+str(i)]]=count
+                            .split(' ')[0])/4 
+                self.tot_pe[self.prefix_pe['sample-'+str(i)]] = count
                 self.prt_progress(\
                     self.prefix_pe['sample-'+str(i)], 'raw data', 'zcat | wc -l', 'raw reads', str(count), '100.00 %')
-#                    self.prefix_pe['sample-'+str(i)], 'raw data', 'FastQC-check', 'raw reads', str(count), '100.00 %')
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 1: view_raw_reads
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -385,9 +355,9 @@ class pipeline_object:
             """ generates a FastQC report for the raw data. """
             cmd = "fastqc %s -o %s --threads %d --quiet; rm %s/*.zip" %(
                 input_file,
-                self.SUBDIR_FastQC_raw, #! Consider passing as function parameter.
+                self.SUBDIR_FastQC_raw,
                 self.args.threads,
-                self.SUBDIR_FastQC_raw) #! Consider passing as function parameter.
+                self.SUBDIR_FastQC_raw)
             with logging_mutex:
                 logger.info("Create a fastqc report of raw %(input_file)s"%locals())
                 logger.debug("view_raw_data: cmdline\n" + cmd)
@@ -484,7 +454,7 @@ class pipeline_object:
             extern.run(cmd) 
            #  monitoring: count of reads          
             name_sample = self.prefix_pe[os.path.basename(output_file).split('_trimm_phiX_ID.log')[0]]            
-            stat= Monitoring(self.tot_pe[name_sample])
+            stat = Monitoring(self.tot_pe[name_sample])
             ## non phiX reads
             trimm_file = os.path.join(self.args.working_dir,
                   [f for f in os.listdir(self.args.working_dir) \
@@ -539,14 +509,8 @@ class pipeline_object:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def concat_for_mapping(input_files, output_files, ID_single, logger, logging_mutex):
             """ Prepare .fq files for the mapping stage. """
-#            print "************** concat_for_mapping locals():", locals()
             cmd_ID = "comm -3 <(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s |sort) <(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s | sort) | awk  '{print $1 $2}' > %s" % \
                     (input_files[0], input_files[1], ID_single)            
-#            cmd_ID = "comm -3 <(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s |sort) " + \
-#                    "<(awk '"'{print substr($1,2) ;getline;getline;getline}'"' %s | sort) | awk  '{print $1 $2}' > %s"%(\
-#                    input_files[0], 
-#                    input_files[1], 
-#                    ID_single)
             cmd_paired = "fxtract -H -S -f '%s' -v %s > %s;fxtract -H -S -f '%s' -v %s > %s"%(
                     ID_single,
                     input_files[0],
@@ -580,7 +544,7 @@ class pipeline_object:
             #extern.run(cmd_single)
             #  monitoring: count of reads
             name_sample = self.prefix_pe[os.path.basename(output_files[0]).split('_concat_paired_R1.fq')[0]]            
-            stat= Monitoring(self.tot_pe[name_sample])
+            stat = Monitoring(self.tot_pe[name_sample])
             ## non ncRNA reads
             non_ncRNA_reads = stat.count_seq_fq(output_files[0])+stat.count_seq_fq(output_files[2])
             self.prt_progress(
@@ -651,7 +615,7 @@ class pipeline_object:
             extern.run(cmd3)
             #  ~~~~ monitoring: count of reads  ~~~~ #   
             name_sample = self.prefix_pe[os.path.basename(output_file).split('.bam')[0]]            
-            stat= Monitoring(self.tot_pe[name_sample])
+            stat = Monitoring(self.tot_pe[name_sample])
             ## reads filtered : mapped with high stringency
             mapped_reads = stat.count_mapping_reads(flagstat,True)
             self.prt_progress(
@@ -678,10 +642,10 @@ class pipeline_object:
                     logger.info("Compute statistics of %(input_file)s (samtools flastat)" % locals())
                     logger.debug("mapping_filter: cmdline\n"+ cmd3)  
                 extern.run(cmd3)
-
+                
                 #  ~~~~ monitoring: count of reads  ~~~~ #   
                 name_sample = self.prefix_pe[os.path.basename(output_file).split('_filtered.bam')[0]]            
-                stat= Monitoring(self.tot_pe[name_sample])
+                stat = Monitoring(self.tot_pe[name_sample])
                 ## reads filtered : mapped with high stringency
                 mapped_reads_f = stat.count_mapping_reads(flagstat,False)
                 self.prt_progress(
@@ -712,8 +676,6 @@ class pipeline_object:
                 extern.run(cmd)        
                 
                 if lib_size != 0:
-#                    cmd1 = "sed 's/\t/|/g' %s | awk  -F '|' 'NR>=2 {$6= $6/%d*10e6}1' OFS='|' |  " + \
-#                            "sed 's/|/\t/g' > %s ; rm %s "%( \
                     cmd1 = "sed 's/\t/|/g' %s | awk  -F '|' 'NR>=2 {$6= $6/%d*10e6}1' OFS='|' |  sed 's/|/\t/g' > %s ; rm %s " %( \
                         coverage_file,
                         lib_size,
@@ -1411,49 +1373,12 @@ class pipeline_object:
         # Assign the ruffus pipeline to the object.
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         self.built_pipeline = rpl
-        print "Pipeline built."
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # PIPELINE: RUN
-        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        #for task in ruffus.pipeline_get_task_names():
-        #    print task
-        #ruffus.cmdline.run(self.args, target_tasks = [trimmomatic])
-        #ruffus.cmdline.run(target_tasks = [trimmomatic])
-        #rpl.run(target_tasks = [trimmomatic])
-        #rpl.run(target_tasks = view_processed_data,  verbose = 1) # verbose = 0
-        #rpl.run(target_tasks = [self.args.end_stages[0]], verbose = 0) # verbose = 0 defaults to 1
-        #rpl.run(target_tasks = [symlink_metaG], verbose = 0) # verbose = 0 defaults to 1
-        #multithread = 3
-        #multiprocess = 5)
-        
-        #ruffus.cmdline.run(self.args, target_tasks = self.target_tasks)
-#        if False and len(self.args.end_stages) == 0:
-#            rpl.run(target_tasks = [self.args.end_stages[0]], verbose = 0) # verbose = 0 defaults to 1
-#        else:
-#            #rpl.run(target_tasks = [], verbose = 0) # verbose = 0 defaults to 1
-#            rpl.run(target_tasks = self.args.end_stages, verbose = 0) # verbose = 0 defaults to 1
-        #rpl.run(target_tasks = self.target_tasks, verbose = 0) # verbose = 0 defaults to 1
-
-#        print "self.args.verbose:", self.args.verbose, type(self.args.verbose)
-#        v = int(self.args.verbose[0])
-#        print "v:", v, type(v)
-#
-#        v = 1 or int(self.args.verbose[0])
-        #rpl.run(target_tasks = self.target_tasks, logger = self.logger, verbose = v) # verbose = 0 defaults to 1
-#        rpl.run(target_tasks = self.target_tasks, logger = self.logger, verbose = v) # verbose = 0 defaults to 1
-        #rpl.run(target_tasks = self.target_tasks, logger = self.logger, verbose = v) # verbose = 0 defaults to 1
-
-        #verbosity = 0 or int(self.args.verbose[0])
-#        self.built_pipeline.run(target_tasks = self.args.target_tasks, logger = self.logger, verbose = verbosity)
-#        print "debug: about to run cmdline"
-#        ruffus.cmdline.run(self.args)
-        #self.built_pipeline.run(logger = self.logger, verbose = verbosity)
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Run the pipeline
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def run_built_pipeline(self):
         assert self.built_pipeline != None, "The pipeline needs to be built before it can be run."
-        print "Pipeline running..."
+        print "Pipeline built and running...\n"
         ruffus.cmdline.run(self.args)
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Post-pipeline activity

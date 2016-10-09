@@ -70,12 +70,10 @@ class pipeline_object:
         ans = not ( \
             (self.restart_at and self.restart_at > round(stage_num, 1)) or \
             (self.halt_after and self.halt_after < round(stage_num, 1)))
-        #print "*** testing stage {0:<3} : {1}".format(stage_num, "Run" if ans else "(no run)")
         return ans
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def require_stage_restart(self, stage_num):
         ans = self.restart_at and (self.restart_at == round(stage_num, 1))
-        #print "*** testing stage {0:<3} : {1}".format(stage_num, "Restart from here" if ans else "(no restart)")
         return ans
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # helpers: restarting and halting of stages.
@@ -203,18 +201,19 @@ class pipeline_object:
                 self.SUBDIR_reads_distribution
                 ]
             # Clean the subdirs (of previous run output) if the relevant stage is to be run.
-            for (stage_name, subdir) in [
-                    ("bam_stats", self.SUBDIR_log), 
-                    ("view_raw_reads", self.SUBDIR_FastQC_raw),
-                    ("trim_raw_reads", self.SUBDIR_FastQC_processed),
-                    ("bam_stats", self.SUBDIR_reads_distribution),
-                    ("prep_for_mapping", self.SUBDIR_processed_reads)]:
-                if self.require_run_stage(const.stage_num(stage_name)):
-                    try:
-                        shutil.rmtree(subdir)
-                        print "deleted:", subdir
-                    except OSError:
-                        pass          
+            if False:
+                for (stage_name, subdir) in [
+                        ("bam_stats", self.SUBDIR_log), 
+                        ("view_raw_reads", self.SUBDIR_FastQC_raw),
+                        ("trim_raw_reads", self.SUBDIR_FastQC_processed),
+                        ("bam_stats", self.SUBDIR_reads_distribution),
+                        ("prep_for_mapping", self.SUBDIR_processed_reads)]:
+                    if self.require_run_stage(const.stage_num(stage_name)):
+                        try:
+                            shutil.rmtree(subdir)
+                            print "deleted:", subdir
+                        except OSError:
+                            pass          
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def setup_logging():
             """ sets up Ruffus' standard python logger, which can be synchronised across concurrent Ruffus tasks.
@@ -245,14 +244,14 @@ class pipeline_object:
         """ (helper): relinks soft symbolic link if necessary.
             (This function from the ruffus website: http://www.ruffus.org.uk/faq.html?highlight=re_symlink).
         """
-        # Guard against soft linking to oneself: Disastrous consequences of deleting the original files
+        # Guard against soft linking to oneself: Disastrous consequences of deleting the original files.
         if input_file == soft_link_name:
             logger.debug("Warning: No symbolic link made. " + \
                 "You are using the original data directory as the working directory.")
             return
         # Soft link already exists: delete for relink?
         if os.path.lexists(soft_link_name):
-        # do not delete or overwrite real (non-soft link) file
+        # Do not delete or overwrite real (non-soft link) file.
             if not os.path.islink(soft_link_name):
                 raise Exception("%s exists and is not a link" % soft_link_name)
             try:
@@ -262,7 +261,7 @@ class pipeline_object:
                     logger.debug("Can't unlink %s" % (soft_link_name))
         with logging_mutex:
             logger.debug("os.symlink(%s, %s)" % (input_file, soft_link_name))
-        # symbolic link relative to original dir so that the entire path can be moved around with breaking everything.
+        # Symbolic link relative to original dir so that the entire path can be moved around with breaking everything.
         os.symlink(
             os.path.relpath(os.path.abspath(input_file), os.path.abspath(os.path.dirname(soft_link_name))), 
             soft_link_name)
@@ -351,13 +350,14 @@ class pipeline_object:
                 logger.info("Linking files %(input_file)s -> %(soft_link_name)s"%locals())
             self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        def view_raw_data(input_file, soft_link_name, logger, logging_mutex):
+        def view_raw_data(input_file, output_file, logger, logging_mutex):
             """ generates a FastQC report for the raw data. """
-            cmd = "fastqc %s -o %s --threads %d --quiet; rm %s/*.zip" %(
+            cmd = "fastqc %s -o %s --threads %d --quiet; rm %s/*.zip; touch %s" %(
                 input_file,
                 self.SUBDIR_FastQC_raw,
                 self.args.threads,
-                self.SUBDIR_FastQC_raw)
+                self.SUBDIR_FastQC_raw,
+                output_file)
             with logging_mutex:
                 logger.info("Create a fastqc report of raw %(input_file)s"%locals())
                 logger.debug("view_raw_data: cmdline\n" + cmd)
@@ -402,13 +402,14 @@ class pipeline_object:
                     name_sample, 'trimming', 'Trimmomatic', 'raw reads', 
                     str(processed_reads), stat.get_tot_percentage(processed_reads))
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        def view_processed_data(input_file, soft_link_name, logger, logging_mutex):
+        def view_processed_data(input_file, output_file, logger, logging_mutex):
             """ Create a fastQC report in the output directory. """
-            cmd = "fastqc %s -o %s --threads %d --quiet; rm %s/*.zip" %(
+            cmd = "fastqc %s -o %s --threads %d --quiet; rm %s/*.zip; touch %s" %(
                     ' '.join(input_file),
                     self.SUBDIR_FastQC_processed,
                     self.args.threads,
-                    self.SUBDIR_FastQC_processed)
+                    self.SUBDIR_FastQC_processed, 
+                    output_file)
             with logging_mutex:
                 logger.info("Create a fastqc report of processed %(input_file)s" %locals())
                 logger.debug("view_processed_data: cmdline\n"+cmd)  
@@ -994,7 +995,7 @@ class pipeline_object:
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Build the pipeline.
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        rpl = ruffus.Pipeline.pipelines["main"] # rpl: 'Ruffus PipeLine'
+        rpl = ruffus.Pipeline.pipelines["main"] # rpl: 'Ruffus Pipe Line'
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Stage 1
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1009,7 +1010,8 @@ class pipeline_object:
             rpl.transform(task_func = view_raw_data, # Create the first output: a fastqc report of raw DATA
                 input = symlink_metaT, 
                 filter = ruffus.formatter(),
-                output = os.path.join(self.SUBDIR_FastQC_raw, "{basename[0]}"+"_fastqc.zip"),
+#                output = os.path.join(self.SUBDIR_FastQC_raw, "{basename[0]}"+"_fastqc.zip"),
+                output = os.path.join(self.args.working_dir, "completed_raw_fastqc_"+"{basename[0]}"),
                 extras = [self.logger, self.logging_mutex]
                 )\
             .mkdir(self.SUBDIR_FastQC_raw)
@@ -1045,7 +1047,8 @@ class pipeline_object:
             rpl.transform(task_func = view_processed_data,
                 input = trimmomatic, 
                 filter = ruffus.formatter(),
-                output = os.path.join(self.SUBDIR_FastQC_processed, "{basename[0]}"+"_fastqc.zip"),
+#                output = os.path.join(self.SUBDIR_FastQC_processed, "{basename[0]}"+"_fastqc.zip"),
+                output = os.path.join(self.args.working_dir, "completed_trimmed_fastqc_"+"{basename[0]}"),
                 extras = [self.logger, self.logging_mutex]
                 )\
             .mkdir(self.SUBDIR_FastQC_processed)
@@ -1389,7 +1392,7 @@ class pipeline_object:
         """
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def rename_SUBDIRs_content():
-            """ renames all files in output directories with their prefixes referring to their original name. """
+            """ renames all files in output subdirectories with prefixes referring to their original name. """
             for subdir in self.SUBDIRS_for_content_renaming:
                 if os.path.exists(subdir):
                     # Iterate through each file in that subdirectory, to rename the file.
@@ -1401,6 +1404,10 @@ class pipeline_object:
                             # by the first part of `self.prefix_pe`, i.e. up to the first "_". 
                             f_oldname = os.path.join(subdir, f)          
                             f_newname = os.path.join(subdir, string.replace(f, f.split('_')[0], original_name))
+                            try:
+                                shutil.rmtree(f_newname)
+                            except OSError:
+                                pass
                             os.rename(f_oldname, f_newname)
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         def clear_SUBDIRs():

@@ -303,10 +303,9 @@ class pipeline_object:
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def prt_progress(self, name_sample, p2, p3, p4, p5, p6):
         """ prints out the provided parameters as a line formated in standard column widths.
-            This function probably belongs in module Monitoring, but is put here until that is sorted out.
-        """
-        maxlen = max(len(s) for s in self.prefix_pe.values())
-        print "{0:{1}}  {2:16} {3:16} {4:20} {5:>12}  {6:>8}".format(name_sample, maxlen, p2, p3, p4, p5, p6)
+            This function probably belongs in module Monitoring, but is put here until that is sorted out. """
+        col1_len = max(len("sample_name"), max(len(s) for s in self.prefix_pe.values()))
+        print "{0:{1}}  {2:16} {3:16} {4:20} {5:>12}  {6:>8}".format(name_sample, col1_len, p2, p3, p4, p5, p6)
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Pipeline Stages
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

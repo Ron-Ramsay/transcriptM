@@ -158,6 +158,7 @@ def process_args(args):
     """ performs further validations on `args` (parsed command-line arguments), and creates additional derived args 
         in that namespace. Some arguments will only be required for certain stages of the pipeline,
         and they should be checked by the pipeline object itself when it is instantiated.
+        returns tempdir object for manual deletion later.
     """
     ''' Note: vars(args) can be used to update the `args` Namespace object as a virtual dictionary. 
             i.e. it is synonymous with `args._dict__`
@@ -211,10 +212,14 @@ def process_args(args):
                 raise Exception("File <{0}> specified in --paired_end does not exist.".format(filename))
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def V_working_dir():
-        """ if the `working_dir` is not specified, creates a temporary directory that will be automatically dissolved.
+        """ if the `working_dir` is not specified, creates a temporary directory that is supposed to be
+            be automatically dissolved, however it doesn't seem to be, so the temdir object is returned by the 
+            function for manual housekeeping removeal later.
         """
         if not args.working_dir:
-            vars(args)['working_dir'] = tempdir.TempDir().name
+            tempdir_obj = tempdir.TempDir()
+            vars(args)['working_dir'] = tempdir_obj.name
+            return tempdir_obj
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def V_adaptersFile():
         """ creates a new arg `adaptersFile`, pointing to an expected file location under `db_path`, 
@@ -242,9 +247,10 @@ def process_args(args):
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     V_stages()
     V_paired_end() 
-    V_working_dir()
+    tempdir_obj = V_working_dir()
     V_adaptersFile()
     V_SortMeRNA()
+    return tempdir_obj
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def debug_namespace(namespace):
     """ helper: for debugging command line arguments. """
@@ -256,9 +262,10 @@ def debug_namespace(namespace):
 if __name__ == '__main__':
     parser = parser_built_with_ruffus()     # Initialise a custom Rufus commond-line parser.
     args = parser.parse_args()              # Parse the command line.
-    process_args(args)                      # Validation and creation of arguments.
+    tempdir_obj = process_args(args)        # Validation and creation of arguments.
     if debug: debug_namespace(args)         # Print out the user's arguments if debugging.
     pl = tm_pipeline.pipeline_object(args)  # custom pipeline object instantiation.
     pl.build_pipeline_stages()              # Build the ruffus pipeline, making further checks on parameters.
     pl.run_built_pipeline()                 # Run the ruffus pipeline.
     pl.clear()                              # Tidy up afterwards.
+    if tempdir_obj: tempdir_obj.dissolve()  # Manually remove 

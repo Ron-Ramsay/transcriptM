@@ -717,7 +717,8 @@ class pipeline_object:
         def transcriptM_table(input_files, output_file, logger, logging_mutex):
             """ Create one table that contains RPKM values for each gene of each bin for the different samples. """
             # Concatenate all the normalized_cov results in a table
-            input_files = list(set(input_files))      
+            #input_files = list(set(input_files))
+            input_files = sorted(list(set(input_files)))
             if len(input_files) == 0: 
                 raise Exception(
                     "Incorrect input detected. Likely causes: "\
@@ -731,7 +732,12 @@ class pipeline_object:
         
             bins_path = [os.path.splitext((self.list_gff[i]))[0] for i in range(len(self.list_gff))]
             for b in bins_path :
-                files_b= [f for f in input_files if re.search('_'+os.path.basename(b)+'_normalized_cov.csv', f)]  
+
+                unsorted = [f for f in input_files if re.search('_'+os.path.basename(b)+'_normalized_cov.csv', f)]  
+                files_b = sorted([f for f in input_files if re.search('_'+os.path.basename(b)+'_normalized_cov.csv', f)])
+                if debug and (unsorted != files_b):
+                    print "\nSample mismatch, unsorted, files_b:", unsorted, files_b
+
                 # first col: bins_name
                 with open(files_b[0],'r') as csvfile:                
                         reader = csv.reader(csvfile, delimiter='\t') 
@@ -777,7 +783,8 @@ class pipeline_object:
             """ Create one table that contains raw count values for each gene of each bin for the different samples.
             """
             # Concatenate all the raw count in a table
-            input_files = list(set(input_files))          
+            #input_files = list(set(input_files))
+            input_files = sorted(list(set(input_files)))
             count_col = [list([]) for _ in xrange(int(len(self.args.paired_end)/2)+3)]       
             # headers of cols ->  0, n-1, n
             count_col[0].append('bin_ID')
@@ -785,8 +792,13 @@ class pipeline_object:
             count_col[-1].append('annotation')      
         
             bins_path =[os.path.splitext((self.list_gff[i]))[0] for i in range(len(self.list_gff))]
-            for b in bins_path :
-                files_b = [f for f in input_files if re.search('_'+os.path.basename(b)+'_count.csv', f)]  
+            for b in bins_path:
+
+                unsorted = [f for f in input_files if re.search('_'+os.path.basename(b)+'_count.csv', f)]
+                files_b = sorted([f for f in input_files if re.search('_'+os.path.basename(b)+'_count.csv', f)])
+                if debug and (unsorted != files_b):
+                    print "\nSample mismatch, unsorted, files_b:", unsorted, files_b
+
                 # first col: bins_name
                 with open(files_b[0], 'r') as csvfile:                    
                         reader = csv.reader(csvfile, delimiter='\t') 

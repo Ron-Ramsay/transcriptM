@@ -734,7 +734,7 @@ class pipeline_object:
             for b in bins_path :
 
                 unsorted = [f for f in input_files if re.search('_'+os.path.basename(b)+'_normalized_cov.csv', f)]  
-                files_b = sorted([f for f in input_files if re.search('_'+os.path.basename(b)+'_normalized_cov.csv', f)])
+                files_b = sorted(unsorted)
                 if debug and (unsorted != files_b):
                     print "\nSample mismatch, unsorted, files_b:", unsorted, files_b
 
@@ -795,7 +795,7 @@ class pipeline_object:
             for b in bins_path:
 
                 unsorted = [f for f in input_files if re.search('_'+os.path.basename(b)+'_count.csv', f)]
-                files_b = sorted([f for f in input_files if re.search('_'+os.path.basename(b)+'_count.csv', f)])
+                files_b = sorted(unsorted)
                 if debug and (unsorted != files_b):
                     print "\nSample mismatch, unsorted, files_b:", unsorted, files_b
 
